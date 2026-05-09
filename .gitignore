@@ -1,0 +1,28 @@
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Build / dependency caches
+node_modules/
+dist/
+build/
+target/
+.venv/
+__pycache__/
+*.pyc
+.coverage
+htmlcov/
+
+# Logs / runtime
+*.log
+.runtime/
+work/
+
+# Secrets
+.env
+.env.*
+!.env.example
