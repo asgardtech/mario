@@ -12,6 +12,8 @@ export interface Player {
   isFacingRight: boolean;
   isCrouching: boolean;
   lastGroundedTime: number;
+  jumpCutApplied: boolean; // Track if variable jump cut has been applied for current jump
+  jumpedThisFrame: boolean; // Track if a jump was performed this frame
 }
 
 export interface Platform {

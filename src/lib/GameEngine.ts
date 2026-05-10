@@ -22,6 +22,9 @@ export class GameEngine {
   ): Player {
     const updated = { ...player };
 
+    // Reset frame-specific flags
+    updated.jumpedThisFrame = false;
+
     // Store previous position before any updates
     const prevPosition = { x: player.position.x, y: player.position.y };
 
@@ -81,6 +84,8 @@ export class GameEngine {
     if ((input.jump || hasBufferedJump) && (updated.isGrounded || coyoteTimeActive)) {
       updated.velocity.y = this.JUMP_FORCE;
       updated.isGrounded = false;
+      updated.jumpedThisFrame = true;
+      updated.jumpCutApplied = false; // Reset jump cut flag for new jump
       // Consume buffered jump if it was used
       if (hasBufferedJump && inputController) {
         inputController.consumeJump();
@@ -88,8 +93,10 @@ export class GameEngine {
     }
 
     // Variable jump height - cut upward velocity when jump released early
-    if (input.jumpReleased && updated.velocity.y < 0) {
+    // Only apply once per jump to prevent cutting velocity every frame
+    if (input.jumpReleased && updated.velocity.y < 0 && !updated.jumpCutApplied) {
       updated.velocity.y *= this.VARIABLE_JUMP_CUT;
+      updated.jumpCutApplied = true;
     }
 
     // Apply gravity

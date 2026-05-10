@@ -32,6 +32,8 @@ export function Game() {
       isFacingRight: true,
       isCrouching: false,
       lastGroundedTime: performance.now(),
+      jumpCutApplied: false,
+      jumpedThisFrame: false,
     };
 
     // Create platforms
@@ -58,8 +60,6 @@ export function Game() {
       // Update
       const input = inputController.getInputState();
 
-      // Capture grounded state before update to properly consume jump input
-      const wasGrounded = player.isGrounded;
       player = gameEngine.updatePlayer(
         player,
         input,
@@ -70,9 +70,9 @@ export function Game() {
         currentTime
       );
 
-      // Consume jump input after processing
-      // Check wasGrounded because isGrounded is set to false when jump is applied
-      if (input.jump && wasGrounded) {
+      // Consume jump input after processing if a jump was actually performed
+      // This works for regular jumps, coyote time jumps, and buffered jumps
+      if (input.jump && player.jumpedThisFrame) {
         inputController.consumeJump();
       }
 
