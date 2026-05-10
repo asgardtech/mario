@@ -27,5 +27,10 @@ export function updatePlayer(
   controls: Controls,
   deltaTime: number
 ): Character {
+  // TODO: Implement player movement logic based on controls and physics
+  // - Apply horizontal movement based on controls.left/right
+  // - Apply jump velocity based on controls.jump
+  // - Apply gravity and velocity updates
+  // - Update player position based on velocity and deltaTime
   return player;
 }

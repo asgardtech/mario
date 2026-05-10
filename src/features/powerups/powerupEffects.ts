@@ -5,19 +5,19 @@ export function applyPowerUp(
   powerUpType: PowerUpType
 ): Character {
   switch (powerUpType) {
-    case 'mushroom':
+    case PowerUpType.Mushroom:
       return {
         ...player,
         maxHealth: 2,
         health: Math.max(player.health, 2),
         powerUpState: powerUpType,
       };
-    case 'fire-flower':
+    case PowerUpType.FireFlower:
       return {
         ...player,
         powerUpState: powerUpType,
       };
-    case 'star':
+    case PowerUpType.Star:
       return {
         ...player,
         powerUpState: powerUpType,
