@@ -55,10 +55,14 @@ export function Game() {
 
       // Update
       const input = inputController.getInputState();
+
+      // Capture grounded state before update to properly consume jump input
+      const wasGrounded = player.isGrounded;
       player = gameEngine.updatePlayer(player, input, platforms, CANVAS_WIDTH, deltaTime);
 
       // Consume jump input after processing
-      if (input.jump && player.isGrounded) {
+      // Check wasGrounded because isGrounded is set to false when jump is applied
+      if (input.jump && wasGrounded) {
         inputController.consumeJump();
       }
 
