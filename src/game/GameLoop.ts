@@ -58,7 +58,7 @@ export class GameLoop {
     handleInput(player, input);
     applyGravity(player);
     updatePosition(player);
-    checkCollisions(player, level.platforms, CANVAS_WIDTH, CANVAS_HEIGHT);
+    checkCollisions(player, level.platforms, this.canvasWidth, this.canvasHeight);
   }
 
   private render(): void {
