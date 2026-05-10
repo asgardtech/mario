@@ -30,6 +30,8 @@ export function Game() {
       height: 48,
       isGrounded: false,
       isFacingRight: true,
+      isCrouching: false,
+      lastGroundedTime: performance.now(),
     };
 
     // Create platforms
@@ -58,7 +60,15 @@ export function Game() {
 
       // Capture grounded state before update to properly consume jump input
       const wasGrounded = player.isGrounded;
-      player = gameEngine.updatePlayer(player, input, platforms, CANVAS_WIDTH, deltaTime);
+      player = gameEngine.updatePlayer(
+        player,
+        input,
+        platforms,
+        CANVAS_WIDTH,
+        deltaTime,
+        inputController,
+        currentTime
+      );
 
       // Consume jump input after processing
       // Check wasGrounded because isGrounded is set to false when jump is applied
@@ -84,18 +94,18 @@ export function Game() {
         ctx.fillStyle = "#8B4513";
       });
 
-      // Draw player
+      // Draw player (adjust visual height when crouching)
+      const visualHeight = player.isCrouching ? player.height * 0.6 : player.height;
+      const visualY = player.isCrouching
+        ? player.position.y + player.height - visualHeight
+        : player.position.y;
+
       ctx.fillStyle = player.isGrounded ? "#FF0000" : "#FF6666";
-      ctx.fillRect(
-        player.position.x,
-        player.position.y,
-        player.width,
-        player.height
-      );
+      ctx.fillRect(player.position.x, visualY, player.width, visualHeight);
 
       // Draw player face
       ctx.fillStyle = "#000000";
-      const eyeY = player.position.y + 15;
+      const eyeY = visualY + 15;
       if (player.isFacingRight) {
         // Eyes
         ctx.fillRect(player.position.x + 18, eyeY, 4, 4);
@@ -109,13 +119,18 @@ export function Game() {
       // Draw controls info
       ctx.fillStyle = "#000000";
       ctx.font = "14px monospace";
-      ctx.fillText("Controls: Arrow Keys / WASD to move, Space to jump", 10, 20);
+      ctx.fillText("Controls: Arrow Keys/WASD to move, Space to jump", 10, 20);
+      ctx.fillText("Shift to sprint, Down/S to crouch", 10, 40);
       ctx.fillText(
         `Position: (${Math.floor(player.position.x)}, ${Math.floor(player.position.y)})`,
         10,
-        40
+        60
       );
-      ctx.fillText(`Grounded: ${player.isGrounded}`, 10, 60);
+      ctx.fillText(
+        `Grounded: ${player.isGrounded} | Crouching: ${player.isCrouching}`,
+        10,
+        80
+      );
 
       animationFrameId = requestAnimationFrame(gameLoop);
     };

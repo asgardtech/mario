@@ -1,39 +1,95 @@
 import { Player, Platform, InputState } from "@/types/game";
+import { InputController } from "./InputController";
 
 export class GameEngine {
-  // Physics constants are now per-second values
+  // Physics constants are now per-second values (updated to match specification)
   private readonly GRAVITY = 980; // pixels per second squared
-  private readonly JUMP_FORCE = -600; // pixels per second
-  private readonly MOVE_SPEED = 250; // pixels per second
+  private readonly JUMP_FORCE = -400; // pixels per second (updated from -600 to -400)
+  private readonly MOVE_SPEED = 200; // pixels per second (updated from 250 to 200)
+  private readonly SPRINT_MULTIPLIER = 1.5; // Sprint speed multiplier
   private readonly MAX_FALL_SPEED = 800; // pixels per second
+  private readonly COYOTE_TIME = 100; // milliseconds
+  private readonly VARIABLE_JUMP_CUT = 0.5; // Cut jump velocity to 50% when released early
 
   public updatePlayer(
     player: Player,
     input: InputState,
     platforms: Platform[],
     canvasWidth: number,
-    deltaTime: number = 1 / 60 // Default to 60 FPS if not provided
+    deltaTime: number = 1 / 60, // Default to 60 FPS if not provided
+    inputController?: InputController,
+    currentTime: number = performance.now()
   ): Player {
     const updated = { ...player };
 
     // Store previous position before any updates
     const prevPosition = { x: player.position.x, y: player.position.y };
 
-    // Apply horizontal movement
-    if (input.left) {
-      updated.velocity.x = -this.MOVE_SPEED;
-      updated.isFacingRight = false;
-    } else if (input.right) {
-      updated.velocity.x = this.MOVE_SPEED;
-      updated.isFacingRight = true;
+    // Track last grounded time for coyote time
+    if (updated.isGrounded) {
+      updated.lastGroundedTime = currentTime;
+    }
+
+    // Determine if coyote time is active
+    const coyoteTimeActive =
+      !updated.isGrounded &&
+      currentTime - updated.lastGroundedTime <= this.COYOTE_TIME;
+
+    // Handle crouch state
+    updated.isCrouching = input.crouch && updated.isGrounded;
+
+    // Apply horizontal movement (disabled when crouching)
+    if (!updated.isCrouching) {
+      // Use last-input-wins for conflicting directional inputs
+      const lastKey = inputController?.getLastDirectionalKey();
+      let moveLeft = false;
+      let moveRight = false;
+
+      if (input.left && input.right) {
+        // Both keys pressed - use last pressed
+        moveLeft = lastKey === "left";
+        moveRight = lastKey === "right";
+      } else {
+        moveLeft = input.left;
+        moveRight = input.right;
+      }
+
+      // Calculate movement speed with sprint modifier
+      let moveSpeed = this.MOVE_SPEED;
+      if (input.sprint) {
+        moveSpeed *= this.SPRINT_MULTIPLIER;
+      }
+
+      if (moveLeft) {
+        updated.velocity.x = -moveSpeed;
+        updated.isFacingRight = false;
+      } else if (moveRight) {
+        updated.velocity.x = moveSpeed;
+        updated.isFacingRight = true;
+      } else {
+        updated.velocity.x = 0;
+      }
     } else {
+      // Stop horizontal movement when crouching
       updated.velocity.x = 0;
     }
 
-    // Apply jump
-    if (input.jump && updated.isGrounded) {
+    // Check for buffered jump (jump pressed slightly before landing)
+    const hasBufferedJump = inputController?.hasBufferedJump(currentTime) ?? false;
+
+    // Apply jump (works with grounded OR coyote time OR buffered jump)
+    if ((input.jump || hasBufferedJump) && (updated.isGrounded || coyoteTimeActive)) {
       updated.velocity.y = this.JUMP_FORCE;
       updated.isGrounded = false;
+      // Consume buffered jump if it was used
+      if (hasBufferedJump && inputController) {
+        inputController.consumeJump();
+      }
+    }
+
+    // Variable jump height - cut upward velocity when jump released early
+    if (input.jumpReleased && updated.velocity.y < 0) {
+      updated.velocity.y *= this.VARIABLE_JUMP_CUT;
     }
 
     // Apply gravity
@@ -81,6 +137,7 @@ export class GameEngine {
           updated.position.y = platform.y - updated.height;
           updated.velocity.y = 0;
           updated.isGrounded = true;
+          updated.lastGroundedTime = currentTime;
           break; // Stop processing after resolving collision
         }
         // Hitting bottom of platform
