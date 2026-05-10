@@ -1,4 +1,5 @@
-import type { Character, PowerUpType } from '@/types';
+import type { Character } from '@/types';
+import { PowerUpType } from '@/types';
 
 export function applyPowerUp(
   player: Character,
