@@ -1,19 +1,10 @@
 import { Route, Routes } from "react-router-dom";
-
-import { Button } from "@/components/ui/button";
+import { Game } from "@/components/Game";
 
 function Home() {
   return (
-    <main className="min-h-screen flex flex-col items-center justify-center gap-6 p-8">
-      <h1 className="text-4xl font-bold tracking-tight">
-        {"mario"}
-      </h1>
-      <p className="text-muted-foreground max-w-prose text-center">
-        {"a mario like game"}
-      </p>
-      <Button onClick={() => console.log("hello from shadcn")}>
-        Get started
-      </Button>
+    <main className="min-h-screen bg-gradient-to-b from-blue-400 to-blue-600">
+      <Game />
     </main>
   );
 }
