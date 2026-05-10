@@ -16,6 +16,9 @@ export class GameEngine {
   ): Player {
     const updated = { ...player };
 
+    // Store previous position before any updates
+    const prevPosition = { x: player.position.x, y: player.position.y };
+
     // Apply horizontal movement
     if (input.left) {
       updated.velocity.x = -this.MOVE_SPEED;
@@ -56,9 +59,9 @@ export class GameEngine {
     updated.isGrounded = false;
     for (const platform of platforms) {
       if (this.checkCollision(updated, platform)) {
-        // Calculate previous position before velocity was applied
-        const prevY = updated.position.y - updated.velocity.y * deltaTime;
-        const prevX = updated.position.x - updated.velocity.x * deltaTime;
+        // Use stored previous position instead of calculating backwards
+        const prevY = prevPosition.y;
+        const prevX = prevPosition.x;
 
         // Calculate overlap amounts to determine collision direction
         const overlapLeft = updated.position.x + updated.width - platform.x;
@@ -78,6 +81,7 @@ export class GameEngine {
           updated.position.y = platform.y - updated.height;
           updated.velocity.y = 0;
           updated.isGrounded = true;
+          break; // Stop processing after resolving collision
         }
         // Hitting bottom of platform
         else if (
@@ -87,6 +91,7 @@ export class GameEngine {
         ) {
           updated.position.y = platform.y + platform.height;
           updated.velocity.y = 0;
+          break; // Stop processing after resolving collision
         }
         // Hitting left side of platform
         else if (
@@ -95,6 +100,7 @@ export class GameEngine {
         ) {
           updated.position.x = platform.x - updated.width;
           updated.velocity.x = 0;
+          break; // Stop processing after resolving collision
         }
         // Hitting right side of platform
         else if (
@@ -103,6 +109,7 @@ export class GameEngine {
         ) {
           updated.position.x = platform.x + platform.width;
           updated.velocity.x = 0;
+          break; // Stop processing after resolving collision
         }
       }
     }
