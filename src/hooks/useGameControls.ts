@@ -22,6 +22,7 @@ export function useGameControls(): Controls {
         setControls((prev) => ({ ...prev, moveRight: true }));
       }
       if (KEYBOARD_CONTROLS.JUMP.includes(key)) {
+        event.preventDefault();
         setControls((prev) => ({ ...prev, jump: true }));
       }
       if (KEYBOARD_CONTROLS.RUN.includes(key)) {

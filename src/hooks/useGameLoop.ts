@@ -12,7 +12,13 @@ export function useGameLoop({
   isPaused = false,
 }: GameLoopOptions) {
   const frameRef = useRef<number>();
+  const onUpdateRef = useRef(onUpdate);
   const fpsInterval = 1000 / fps;
+
+  // Keep the ref updated with the latest onUpdate callback
+  useEffect(() => {
+    onUpdateRef.current = onUpdate;
+  }, [onUpdate]);
 
   useEffect(() => {
     if (isPaused) {
@@ -33,7 +39,7 @@ export function useGameLoop({
       if (elapsed > fpsInterval) {
         then = now - (elapsed % fpsInterval);
         const deltaTime = elapsed / 1000;
-        onUpdate(deltaTime);
+        onUpdateRef.current(deltaTime);
       }
     };
 
@@ -44,5 +50,5 @@ export function useGameLoop({
         cancelAnimationFrame(frameRef.current);
       }
     };
-  }, [onUpdate, fpsInterval, isPaused]);
+  }, [fpsInterval, isPaused]);
 }
