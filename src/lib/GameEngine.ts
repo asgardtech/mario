@@ -54,10 +54,15 @@ export class GameEngine {
     updated.isGrounded = false;
     for (const platform of platforms) {
       if (this.checkCollision(updated, platform)) {
+        // Calculate previous position before velocity was applied
+        const prevY = updated.position.y - updated.velocity.y;
+        const prevX = updated.position.x - updated.velocity.x;
+
         // Landing on top of platform
         if (
           updated.velocity.y > 0 &&
-          updated.position.y + updated.height <= platform.y + updated.velocity.y
+          prevY + updated.height <= platform.y &&
+          updated.position.y + updated.height >= platform.y
         ) {
           updated.position.y = platform.y - updated.height;
           updated.velocity.y = 0;
