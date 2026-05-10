@@ -1,4 +1,4 @@
-import { GameState, InputState, Platform } from './types';
+import { GameState, InputState, Platform, TileMap, Tile } from './types';
 import { Physics } from './physics';
 import { Renderer } from './renderer';
 
@@ -24,18 +24,118 @@ export class GameEngine {
     this.setupInputHandlers();
   }
 
+  private createTileMap(): TileMap {
+    const tileWidth = 32;
+    const tileHeight = 32;
+    const cols = 100;
+    const rows = 20;
+
+    const tiles: Tile[][] = [];
+    for (let row = 0; row < rows; row++) {
+      tiles[row] = [];
+      for (let col = 0; col < cols; col++) {
+        tiles[row][col] = { type: 'empty', color: '' };
+      }
+    }
+
+    // Ground floor from 0 to 25
+    for (let col = 0; col < 25; col++) {
+      tiles[17][col] = { type: 'ground', color: '#8B4513' };
+      tiles[18][col] = { type: 'ground', color: '#654321' };
+    }
+
+    // Platform at row 14, cols 6-10
+    for (let col = 6; col < 11; col++) {
+      tiles[14][col] = { type: 'brick', color: '#228B22' };
+    }
+
+    // Platform at row 11, cols 12-16
+    for (let col = 12; col < 17; col++) {
+      tiles[11][col] = { type: 'brick', color: '#228B22' };
+    }
+
+    // Platform at row 14, cols 18-22
+    for (let col = 18; col < 23; col++) {
+      tiles[14][col] = { type: 'brick', color: '#228B22' };
+    }
+
+    // Ground floor from 25 to 62
+    for (let col = 25; col < 63; col++) {
+      tiles[17][col] = { type: 'ground', color: '#8B4513' };
+      tiles[18][col] = { type: 'ground', color: '#654321' };
+    }
+
+    // Platform at row 14, cols 28-31
+    for (let col = 28; col < 32; col++) {
+      tiles[14][col] = { type: 'brick', color: '#228B22' };
+    }
+
+    // Platform at row 11, cols 34-37
+    for (let col = 34; col < 38; col++) {
+      tiles[11][col] = { type: 'brick', color: '#228B22' };
+    }
+
+    // Platform at row 8, cols 40-44
+    for (let col = 40; col < 45; col++) {
+      tiles[8][col] = { type: 'brick', color: '#228B22' };
+    }
+
+    // Ground floor from 63 to end
+    for (let col = 63; col < cols; col++) {
+      tiles[17][col] = { type: 'ground', color: '#8B4513' };
+      tiles[18][col] = { type: 'ground', color: '#654321' };
+    }
+
+    return {
+      tiles,
+      tileWidth,
+      tileHeight,
+      worldWidth: cols * tileWidth,
+      worldHeight: rows * tileHeight,
+    };
+  }
+
+  private generatePlatformsFromTileMap(tileMap: TileMap): Platform[] {
+    const platforms: Platform[] = [];
+
+    for (let row = 0; row < tileMap.tiles.length; row++) {
+      for (let col = 0; col < tileMap.tiles[row].length; col++) {
+        const tile = tileMap.tiles[row][col];
+        if (tile.type !== 'empty') {
+          // Merge adjacent horizontal tiles
+          let width = tileMap.tileWidth;
+          let mergedCol = col;
+
+          while (mergedCol + 1 < tileMap.tiles[row].length &&
+                 tileMap.tiles[row][mergedCol + 1].type === tile.type &&
+                 tileMap.tiles[row][mergedCol + 1].color === tile.color) {
+            width += tileMap.tileWidth;
+            mergedCol++;
+          }
+
+          platforms.push({
+            position: {
+              x: col * tileMap.tileWidth,
+              y: row * tileMap.tileHeight
+            },
+            velocity: { x: 0, y: 0 },
+            width,
+            height: tileMap.tileHeight,
+            type: 'platform',
+            color: tile.color,
+          });
+
+          col = mergedCol;
+        }
+      }
+    }
+
+    return platforms;
+  }
+
   private createInitialState(): GameState {
-    const platforms: Platform[] = [
-      { position: { x: 0, y: 550 }, velocity: { x: 0, y: 0 }, width: 800, height: 50, type: 'platform', color: '#8B4513' },
-      { position: { x: 200, y: 450 }, velocity: { x: 0, y: 0 }, width: 150, height: 30, type: 'platform', color: '#228B22' },
-      { position: { x: 400, y: 350 }, velocity: { x: 0, y: 0 }, width: 150, height: 30, type: 'platform', color: '#228B22' },
-      { position: { x: 600, y: 450 }, velocity: { x: 0, y: 0 }, width: 150, height: 30, type: 'platform', color: '#228B22' },
-      { position: { x: 800, y: 550 }, velocity: { x: 0, y: 0 }, width: 400, height: 50, type: 'platform', color: '#8B4513' },
-      { position: { x: 900, y: 450 }, velocity: { x: 0, y: 0 }, width: 100, height: 30, type: 'platform', color: '#228B22' },
-      { position: { x: 1100, y: 350 }, velocity: { x: 0, y: 0 }, width: 100, height: 30, type: 'platform', color: '#228B22' },
-      { position: { x: 1300, y: 250 }, velocity: { x: 0, y: 0 }, width: 150, height: 30, type: 'platform', color: '#228B22' },
-      { position: { x: 1500, y: 550 }, velocity: { x: 0, y: 0 }, width: 500, height: 50, type: 'platform', color: '#8B4513' },
-    ];
+    const tileMap = this.createTileMap();
+    const platforms = this.generatePlatformsFromTileMap(tileMap);
 
     return {
       player: {
@@ -48,6 +148,8 @@ export class GameEngine {
         isFacingRight: true,
       },
       platforms,
+      tileMap,
+      particles: [],
       camera: { x: 0, y: 0 },
       score: 0,
       isPlaying: false,

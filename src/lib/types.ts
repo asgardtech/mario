@@ -22,9 +22,41 @@ export interface Platform extends Entity {
   color: string;
 }
 
+export interface Tile {
+  type: 'ground' | 'brick' | 'empty';
+  color: string;
+}
+
+export interface TileMap {
+  tiles: Tile[][];
+  tileWidth: number;
+  tileHeight: number;
+  worldWidth: number;
+  worldHeight: number;
+}
+
+export interface Particle {
+  position: Vec2;
+  velocity: Vec2;
+  lifetime: number;
+  maxLifetime: number;
+  size: number;
+  color: string;
+}
+
+export interface ParallaxLayer {
+  image?: HTMLImageElement;
+  color: string;
+  speed: number;
+  yOffset: number;
+  height: number;
+}
+
 export interface GameState {
   player: Player;
   platforms: Platform[];
+  tileMap: TileMap;
+  particles: Particle[];
   camera: Vec2;
   score: number;
   isPlaying: boolean;
