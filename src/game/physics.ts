@@ -38,7 +38,7 @@ export function updatePosition(player: Player): void {
   player.position.y += player.velocity.y;
 }
 
-export function checkCollisions(player: Player, platforms: Platform[], canvasHeight: number): void {
+export function checkCollisions(player: Player, platforms: Platform[], canvasWidth: number, canvasHeight: number): void {
   player.isGrounded = false;
 
   for (const platform of platforms) {
@@ -85,8 +85,18 @@ export function checkCollisions(player: Player, platforms: Platform[], canvasHei
     player.isJumping = false;
   }
 
+  if (player.position.y < 0) {
+    player.position.y = 0;
+    player.velocity.y = 0;
+  }
+
   if (player.position.x < 0) {
     player.position.x = 0;
+    player.velocity.x = 0;
+  }
+
+  if (player.position.x + player.width > canvasWidth) {
+    player.position.x = canvasWidth - player.width;
     player.velocity.x = 0;
   }
 }

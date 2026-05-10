@@ -2,7 +2,7 @@ import { GameState } from "./types";
 import { InputHandler } from "./input";
 import { Renderer } from "./renderer";
 import { applyGravity, handleInput, updatePosition, checkCollisions } from "./physics";
-import { CANVAS_HEIGHT } from "./constants";
+import { CANVAS_WIDTH, CANVAS_HEIGHT } from "./constants";
 
 export class GameLoop {
   private animationFrameId: number | null = null;
@@ -58,7 +58,7 @@ export class GameLoop {
     handleInput(player, input);
     applyGravity(player);
     updatePosition(player);
-    checkCollisions(player, level.platforms, CANVAS_HEIGHT);
+    checkCollisions(player, level.platforms, CANVAS_WIDTH, CANVAS_HEIGHT);
   }
 
   private render(): void {
