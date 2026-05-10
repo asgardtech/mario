@@ -6,6 +6,7 @@ export class InputController {
     right: false,
     jump: false,
   };
+  private jumpPressed = false;
 
   constructor() {
     this.handleKeyDown = this.handleKeyDown.bind(this);
@@ -37,7 +38,11 @@ export class InputController {
       case "Space":
       case "KeyW":
       case "ArrowUp":
-        this.keys.jump = true;
+        // Only register jump if key wasn't already pressed (prevents holding)
+        if (!this.jumpPressed) {
+          this.keys.jump = true;
+          this.jumpPressed = true;
+        }
         event.preventDefault();
         break;
     }
@@ -57,11 +62,16 @@ export class InputController {
       case "KeyW":
       case "ArrowUp":
         this.keys.jump = false;
+        this.jumpPressed = false;
         break;
     }
   }
 
   public getInputState(): InputState {
     return { ...this.keys };
+  }
+
+  public consumeJump(): void {
+    this.keys.jump = false;
   }
 }

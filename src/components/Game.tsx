@@ -46,11 +46,21 @@ export function Game() {
     inputController.attach();
 
     let animationFrameId: number;
+    let lastTime = performance.now();
 
-    const gameLoop = () => {
+    const gameLoop = (currentTime: number) => {
+      // Calculate delta time in seconds
+      const deltaTime = Math.min((currentTime - lastTime) / 1000, 0.1); // Cap at 0.1s to prevent huge jumps
+      lastTime = currentTime;
+
       // Update
       const input = inputController.getInputState();
-      player = gameEngine.updatePlayer(player, input, platforms, CANVAS_WIDTH);
+      player = gameEngine.updatePlayer(player, input, platforms, CANVAS_WIDTH, deltaTime);
+
+      // Consume jump input after processing
+      if (input.jump && player.isGrounded) {
+        inputController.consumeJump();
+      }
 
       // Render
       ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);

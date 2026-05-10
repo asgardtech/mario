@@ -1,16 +1,18 @@
 import { Player, Platform, InputState } from "@/types/game";
 
 export class GameEngine {
-  private readonly GRAVITY = 0.5;
-  private readonly JUMP_FORCE = -12;
-  private readonly MOVE_SPEED = 5;
-  private readonly MAX_FALL_SPEED = 15;
+  // Physics constants are now per-second values
+  private readonly GRAVITY = 980; // pixels per second squared
+  private readonly JUMP_FORCE = -600; // pixels per second
+  private readonly MOVE_SPEED = 250; // pixels per second
+  private readonly MAX_FALL_SPEED = 800; // pixels per second
 
   public updatePlayer(
     player: Player,
     input: InputState,
     platforms: Platform[],
-    canvasWidth: number
+    canvasWidth: number,
+    deltaTime: number = 1 / 60 // Default to 60 FPS if not provided
   ): Player {
     const updated = { ...player };
 
@@ -33,15 +35,15 @@ export class GameEngine {
 
     // Apply gravity
     if (!updated.isGrounded) {
-      updated.velocity.y += this.GRAVITY;
+      updated.velocity.y += this.GRAVITY * deltaTime;
       if (updated.velocity.y > this.MAX_FALL_SPEED) {
         updated.velocity.y = this.MAX_FALL_SPEED;
       }
     }
 
-    // Update position
-    updated.position.x += updated.velocity.x;
-    updated.position.y += updated.velocity.y;
+    // Update position based on velocity and delta time
+    updated.position.x += updated.velocity.x * deltaTime;
+    updated.position.y += updated.velocity.y * deltaTime;
 
     // Keep player within canvas bounds horizontally
     if (updated.position.x < 0) {
@@ -55,14 +57,23 @@ export class GameEngine {
     for (const platform of platforms) {
       if (this.checkCollision(updated, platform)) {
         // Calculate previous position before velocity was applied
-        const prevY = updated.position.y - updated.velocity.y;
-        const prevX = updated.position.x - updated.velocity.x;
+        const prevY = updated.position.y - updated.velocity.y * deltaTime;
+        const prevX = updated.position.x - updated.velocity.x * deltaTime;
+
+        // Calculate overlap amounts to determine collision direction
+        const overlapLeft = updated.position.x + updated.width - platform.x;
+        const overlapRight = platform.x + platform.width - updated.position.x;
+        const overlapTop = updated.position.y + updated.height - platform.y;
+        const overlapBottom = platform.y + platform.height - updated.position.y;
+
+        // Find the smallest overlap to determine collision side
+        const minOverlap = Math.min(overlapLeft, overlapRight, overlapTop, overlapBottom);
 
         // Landing on top of platform
         if (
+          minOverlap === overlapTop &&
           updated.velocity.y > 0 &&
-          prevY + updated.height <= platform.y &&
-          updated.position.y + updated.height >= platform.y
+          prevY + updated.height <= platform.y
         ) {
           updated.position.y = platform.y - updated.height;
           updated.velocity.y = 0;
@@ -70,19 +81,27 @@ export class GameEngine {
         }
         // Hitting bottom of platform
         else if (
+          minOverlap === overlapBottom &&
           updated.velocity.y < 0 &&
-          updated.position.y >= platform.y + platform.height
+          prevY >= platform.y + platform.height
         ) {
           updated.position.y = platform.y + platform.height;
           updated.velocity.y = 0;
         }
-        // Hitting side of platform
-        else {
-          if (updated.velocity.x > 0) {
-            updated.position.x = platform.x - updated.width;
-          } else if (updated.velocity.x < 0) {
-            updated.position.x = platform.x + platform.width;
-          }
+        // Hitting left side of platform
+        else if (
+          minOverlap === overlapLeft &&
+          prevX + updated.width <= platform.x
+        ) {
+          updated.position.x = platform.x - updated.width;
+          updated.velocity.x = 0;
+        }
+        // Hitting right side of platform
+        else if (
+          minOverlap === overlapRight &&
+          prevX >= platform.x + platform.width
+        ) {
+          updated.position.x = platform.x + platform.width;
           updated.velocity.x = 0;
         }
       }
