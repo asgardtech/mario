@@ -2,13 +2,13 @@ import { GameState } from "./types";
 import { InputHandler } from "./input";
 import { Renderer } from "./renderer";
 import { applyGravity, handleInput, updatePosition, checkCollisions } from "./physics";
-import { CANVAS_WIDTH, CANVAS_HEIGHT } from "./constants";
+import { FRAME_TIME } from "./constants";
 
 export class GameLoop {
   private animationFrameId: number | null = null;
   private lastFrameTime: number = 0;
   private accumulator: number = 0;
-  private readonly fixedTimeStep: number = 1000 / 60;
+  private readonly fixedTimeStep: number = FRAME_TIME;
 
   constructor(
     private state: GameState,

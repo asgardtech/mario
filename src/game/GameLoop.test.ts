@@ -1,9 +1,9 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, vi, afterEach } from "vitest";
 import { GameLoop } from "./GameLoop";
 import { InputHandler } from "./input";
 import { Renderer } from "./renderer";
 import { createInitialState } from "./createInitialState";
-import { CANVAS_WIDTH, CANVAS_HEIGHT } from "./constants";
+import { CANVAS_WIDTH, CANVAS_HEIGHT, FRAME_TIME } from "./constants";
 
 describe("GameLoop", () => {
   let gameLoop: GameLoop;
@@ -12,6 +12,8 @@ describe("GameLoop", () => {
   let renderer: Renderer;
 
   beforeEach(() => {
+    vi.useFakeTimers();
+
     mockCtx = {
       fillStyle: "",
       fillRect: vi.fn(),
@@ -31,6 +33,11 @@ describe("GameLoop", () => {
       CANVAS_WIDTH,
       CANVAS_HEIGHT
     );
+  });
+
+  afterEach(() => {
+    gameLoop.stop();
+    vi.useRealTimers();
   });
 
   it("should initialize with correct state", () => {
@@ -71,5 +78,64 @@ describe("GameLoop", () => {
   it("should have platforms in the level", () => {
     const state = gameLoop.getState();
     expect(state.level.platforms.length).toBeGreaterThan(0);
+  });
+
+  describe("game loop execution", () => {
+    it("should call render on each animation frame", () => {
+      const renderSpy = vi.spyOn(renderer, "render");
+      const clearSpy = vi.spyOn(renderer, "clear");
+
+      gameLoop.start();
+
+      vi.advanceTimersByTime(FRAME_TIME);
+
+      expect(clearSpy).toHaveBeenCalled();
+      expect(renderSpy).toHaveBeenCalled();
+    });
+
+    it("should update game state during the loop", () => {
+      const state = gameLoop.getState();
+      const initialY = state.player.position.y;
+
+      state.player.velocity.y = 5;
+      state.player.isGrounded = false;
+
+      gameLoop.start();
+      vi.advanceTimersByTime(FRAME_TIME * 2);
+
+      expect(state.player.position.y).not.toBe(initialY);
+    });
+
+    it("should use fixed timestep accumulator", () => {
+      const renderSpy = vi.spyOn(renderer, "render");
+
+      gameLoop.start();
+
+      vi.advanceTimersByTime(FRAME_TIME / 2);
+      const renderCallsHalf = renderSpy.mock.calls.length;
+
+      vi.advanceTimersByTime(FRAME_TIME / 2);
+      const renderCallsFull = renderSpy.mock.calls.length;
+
+      expect(renderCallsFull).toBeGreaterThan(renderCallsHalf);
+    });
+
+
+    it("should stop updating when stopped", () => {
+      const renderSpy = vi.spyOn(renderer, "render");
+
+      gameLoop.start();
+      vi.advanceTimersByTime(FRAME_TIME);
+      const callsWhileRunning = renderSpy.mock.calls.length;
+
+      gameLoop.stop();
+      renderSpy.mockClear();
+
+      vi.advanceTimersByTime(FRAME_TIME * 10);
+      const callsAfterStopping = renderSpy.mock.calls.length;
+
+      expect(callsWhileRunning).toBeGreaterThan(0);
+      expect(callsAfterStopping).toBe(0);
+    });
   });
 });
