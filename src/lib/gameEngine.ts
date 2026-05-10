@@ -8,6 +8,7 @@ export class GameEngine {
   private renderer: Renderer;
   private input: InputState;
   private animationFrameId: number | null = null;
+  private lastFrameTime = performance.now();
 
   constructor(canvas: HTMLCanvasElement) {
     this.renderer = new Renderer(canvas);
@@ -53,29 +54,31 @@ export class GameEngine {
     };
   }
 
-  private setupInputHandlers() {
-    window.addEventListener('keydown', (e) => {
-      if (e.key === 'ArrowLeft') this.input.left = true;
-      if (e.key === 'ArrowRight') this.input.right = true;
-      if (e.key === ' ') {
-        e.preventDefault();
-        this.input.space = true;
-        if (!this.state.isPlaying) {
-          this.state.isPlaying = true;
-        } else {
-          this.input.jump = true;
-        }
-      }
-    });
+  private keydownHandler = (e: KeyboardEvent) => {
+    if (e.key === 'ArrowLeft') this.input.left = true;
+    if (e.key === 'ArrowRight') this.input.right = true;
+    if (e.key === ' ') {
+      e.preventDefault();
+      this.input.jump = true;
+      this.input.space = true;
+    }
+    if (e.key === 'Enter' && !this.state.isPlaying) {
+      this.state.isPlaying = true;
+    }
+  };
 
-    window.addEventListener('keyup', (e) => {
-      if (e.key === 'ArrowLeft') this.input.left = false;
-      if (e.key === 'ArrowRight') this.input.right = false;
-      if (e.key === ' ') {
-        this.input.jump = false;
-        this.input.space = false;
-      }
-    });
+  private keyupHandler = (e: KeyboardEvent) => {
+    if (e.key === 'ArrowLeft') this.input.left = false;
+    if (e.key === 'ArrowRight') this.input.right = false;
+    if (e.key === ' ') {
+      this.input.jump = false;
+      this.input.space = false;
+    }
+  };
+
+  private setupInputHandlers() {
+    window.addEventListener('keydown', this.keydownHandler);
+    window.addEventListener('keyup', this.keyupHandler);
   }
 
   start() {
@@ -87,14 +90,20 @@ export class GameEngine {
       cancelAnimationFrame(this.animationFrameId);
       this.animationFrameId = null;
     }
+    window.removeEventListener('keydown', this.keydownHandler);
+    window.removeEventListener('keyup', this.keyupHandler);
   }
 
   private gameLoop = () => {
+    const currentTime = performance.now();
+    const deltaTime = (currentTime - this.lastFrameTime) / 16.67;
+    this.lastFrameTime = currentTime;
+
     this.physics.update(this.state, {
       left: this.input.left,
       right: this.input.right,
       jump: this.input.jump,
-    });
+    }, deltaTime, this.renderer.getWidth());
 
     this.renderer.render(this.state);
 
@@ -103,6 +112,10 @@ export class GameEngine {
 
   resize(width: number, height: number) {
     this.renderer.resize(width, height);
+  }
+
+  getCanvasWidth(): number {
+    return this.renderer.getWidth();
   }
 
   getState(): GameState {

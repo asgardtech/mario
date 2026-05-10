@@ -74,7 +74,7 @@ export class Renderer {
       this.ctx.fillStyle = '#FFFFFF';
       this.ctx.font = '48px monospace';
       this.ctx.textAlign = 'center';
-      this.ctx.fillText('Press SPACE to Start', this.width / 2, this.height / 2);
+      this.ctx.fillText('Press ENTER to Start', this.width / 2, this.height / 2);
       this.ctx.font = '24px monospace';
       this.ctx.fillText('Arrow Keys to Move, Space to Jump', this.width / 2, this.height / 2 + 50);
       this.ctx.textAlign = 'left';
@@ -84,5 +84,9 @@ export class Renderer {
   resize(width: number, height: number) {
     this.width = width;
     this.height = height;
+  }
+
+  getWidth(): number {
+    return this.width;
   }
 }

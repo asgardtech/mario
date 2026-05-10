@@ -1,0 +1,196 @@
+You are an autonomous coding agent. Your pull request #14 received review feedback and needs changes.
+
+## Original Issue #5: Implement rendering/visualization layer
+
+(no description)
+
+## Review Feedback
+
+**viovanov:**
+# Code Review: PR #14 - Implement rendering/visualization layer
+
+## Summary
+This PR successfully implements a complete rendering and visualization layer for a Mario-like platformer game using HTML5 Canvas. The implementation includes a clean architecture with separated concerns (Game component, GameEngine, Physics, Renderer), proper TypeScript typing, and functional gameplay mechanics.
+
+## Positives
+- ✅ Complete canvas-based rendering system with proper separation of concerns
+- ✅ Well-structured TypeScript types with clear interfaces
+- ✅ Proper game loop using `requestAnimationFrame`
+- ✅ Camera system that follows the player
+- ✅ AABB collision detection with resolution
+- ✅ Responsive canvas sizing with window resize handling
+- ✅ Clean React integration with proper ref management and cleanup
+
+## Critical Issues
+
+### 1. Memory Leak - Event Listeners Not Cleaned Up
+**File:** `src/lib/gameEngine.ts:8165-8188`
+
+The `setupInputHandlers()` method adds event listeners to the `window` object, but these are never removed. When the component unmounts and `engine.stop()` is called, only the animation frame is cancelled—the event listeners remain attached.
+
+**Impact:** Memory leak when component remounts, multiple listeners accumulating
+
+**Fix:** Add cleanup in the `stop()` method:
+```typescript
+private keydownHandler = (e: KeyboardEvent) => { /* ... */ };
+private keyupHandler = (e: KeyboardEvent) => { /* ... */ };
+
+private setupInputHandlers() {
+  window.addEventListener('keydown', this.keydownHandler);
+  window.addEventListener('keyup', this.keyupHandler);
+}
+
+stop() {
+  if (this.animationFrameId !== null) {
+    cancelAnimationFrame(this.animationFrameId);
+    this.animationFrameId = null;
+  }
+  window.removeEventListener('keydown', this.keydownHandler);
+  window.removeEventListener('keyup', this.keyupHandler);
+}
+```
+
+### 2. No Frame Time Delta - Variable Game Speed
+**File:** `src/lib/physics.ts:8235-8242`, `src/lib/gameEngine.ts:8201-8211`
+
+The physics update doesn't account for variable frame times. On slower devices or when tab is backgrounded, the game will run at different speeds. All velocity/gravity values assume 60fps.
+
+**Impact:** Inconsistent gameplay across devices, potential fast-forwarding when tab regains focus
+
+**Fix:** Pass delta time to physics update:
+```typescript
+private lastFrameTime = performance.now();
+
+private gameLoop = () => {
+  const currentTime = performance.now();
+  const deltaTime = (currentTime - this.lastFrameTime) / 16.67; // Normalize to 60fps
+  this.lastFrameTime = currentTime;
+  
+  this.physics.update(this.state, { ... }, deltaTime);
+  // ...
+};
+```
+
+Then multiply all velocity/position changes by `deltaTime` in physics.
+
+## Major Issues
+
+### 3. Camera Positioning Not Responsive
+**File:** `src/lib/physics.ts:8313-8318`
+
+The camera offset is hardcoded to `player.position.x - 300`, which doesn't account for the actual canvas width. On narrow screens, the player will be off-center or even off-screen.
+
+**Fix:**
+```typescript
+private updateCamera(camera: Vec2, player: Player, canvasWidth: number) {
+  const targetX = player.position.x - canvasWidth / 2;
+  camera.x = Math.max(0, targetX);
+}
+```
+
+Pass `canvasWidth` through the update chain.
+
+### 4. No Player Boundary Checking
+**File:** `src/lib/physics.ts:8244-8262`
+
+The player can move left beyond x=0 and can fall indefinitely below the screen. There's no death/respawn mechanic or boundary enforcement.
+
+**Fix:** Add boundary checks:
+```typescript
+private updatePlayer(player: Player, input: { ... }, worldWidth: number) {
+  // ... existing movement code ...
+  
+  // Clamp player position
+  player.position.x = Math.max(0, Math.min(player.position.x, worldWidth - player.width));
+  
+  // Respawn if fell off screen
+  if (player.position.y > 700) {
+    player.position = { x: 100, y: 400 };
+    player.velocity = { x: 0, y: 0 };
+  }
+}
+```
+
+### 5. Space Key Dual Behavior Is Confusing
+**File:** `src/lib/gameEngine.ts:8169-8177`
+
+The space key both starts the game AND makes the player jump, but on first press it only starts—you can't jump immediately. This creates a poor UX where the player must press space twice to actually start playing.
+
+**Fix:** Start the game automatically when the component mounts, or use a separate key (Enter) to start:
+```typescript
+if (e.key === ' ') {
+  e.preventDefault();
+  this.input.jump = true;
+}
+if (e.key === 'Enter' && !this.state.isPlaying) {
+  this.state.isPlaying = true;
+}
+```
+
+## Minor Issues
+
+### 6. Score Field Unused
+**File:** `src/lib/gameEngine.ts:8160`, `src/lib/renderer.ts:8393`
+
+The score is displayed but never incremented anywhere in the code. Consider adding collectibles or removing the score display until scoring is implemented.
+
+### 7. Magic Numbers Throughout
+**Files:** Multiple
+
+Various hardcoded values like camera offset (300), eye positions, platform colors. Consider extracting to constants for maintainability.
+
+### 8. Canvas Resize Doesn't Adjust Game State
+**File:** `src/components/Game.tsx:8064-8070`
+
+When canvas dimensions change, the renderer is updated but game state (platform positions, player position) aren't adjusted. If canvas shrinks significantly, gameplay could be affected.
+
+## Testing Recommendations
+- ✅ Test on different screen sizes and aspect ratios
+- ✅ Test tab backgrounding/foregrounding to verify frame timing
+- ✅ Test component mount/unmount cycles to verify no memory leaks
+- ✅ Test edge cases: player at world boundaries, falling off platforms
+- ⚠️ Add automated tests for collision detection logic
+- ⚠️ Add tests for physics calculations
+
+## Verdict
+The implementation successfully delivers a functional rendering and visualization layer with solid architecture. However, the **critical memory leak** and **frame timing issues** need to be addressed before merge. The boundary checking and camera positioning issues significantly impact gameplay quality.
+
+**Recommendation:** Address critical and major issues, then this will be ready to merge.
+
+---
+
+**viovanov:**
+## Automated Code Review
+
+## Review Complete
+
+I've reviewed PR #14 which implements the rendering/visualization layer for the Mario platformer game. The implementation includes:
+
+**What was delivered:**
+- Complete HTML5 Canvas rendering system
+- Game engine with physics simulation
+- Collision detection and resolution
+- Camera system that follows the player
+- Keyboard controls for player movement
+- Clean TypeScript architecture with separated concerns
+
+**Critical issues found:**
+
+1. **Memory leak**: Event listeners attached to `window` are never cleaned up when the component unmounts
+2. **Frame timing bug**: No delta time handling causes variable game speed across devices
+3. **Camera positioning**: Hardcoded offset doesn't work responsively
+4. **Missing boundaries**: Player can move/fall off-screen with no respawn
+5. **UX issue**: Space key behavior is confusing (requires double-press to start and jump)
+
+**Review posted:** https://github.com/asgardtech/mario/pull/14#issuecomment-4415317641
+
+The implementation successfully delivers a functional rendering layer, but the memory leak and frame timing issues are critical bugs that must be fixed. The boundary checking and camera issues also significantly impact gameplay quality.
+
+**VERDICT: CHANGES_REQUESTED**
+
+Instructions:
+1. Read the review feedback above carefully.
+2. Address each piece of feedback by modifying the code.
+3. Commit your changes with a clear message referencing the feedback.
+4. Do NOT create a new PR -- your commits will be pushed to the existing branch.
+5. Do NOT include "Closes #" or "Fixes #" in commit messages — the issue lives on a separate project board.

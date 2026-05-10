@@ -4,18 +4,20 @@ const GRAVITY = 0.5;
 const PLAYER_SPEED = 5;
 const JUMP_FORCE = -12;
 const MAX_FALL_SPEED = 15;
+const WORLD_WIDTH = 2000;
+const RESPAWN_Y_THRESHOLD = 700;
 
 export class Physics {
-  update(state: GameState, input: { left: boolean; right: boolean; jump: boolean }) {
+  update(state: GameState, input: { left: boolean; right: boolean; jump: boolean }, deltaTime: number = 1, canvasWidth: number = 800) {
     if (!state.isPlaying) return;
 
-    this.updatePlayer(state.player, input);
-    this.applyGravity(state.player);
+    this.updatePlayer(state.player, input, deltaTime);
+    this.applyGravity(state.player, deltaTime);
     this.handleCollisions(state.player, state.platforms);
-    this.updateCamera(state.camera, state.player);
+    this.updateCamera(state.camera, state.player, canvasWidth);
   }
 
-  private updatePlayer(player: Player, input: { left: boolean; right: boolean; jump: boolean }) {
+  private updatePlayer(player: Player, input: { left: boolean; right: boolean; jump: boolean }, deltaTime: number) {
     if (input.left) {
       player.velocity.x = -PLAYER_SPEED;
       player.isFacingRight = false;
@@ -31,12 +33,20 @@ export class Physics {
       player.isJumping = true;
     }
 
-    player.position.x += player.velocity.x;
-    player.position.y += player.velocity.y;
+    player.position.x += player.velocity.x * deltaTime;
+    player.position.y += player.velocity.y * deltaTime;
+
+    player.position.x = Math.max(0, Math.min(player.position.x, WORLD_WIDTH - player.width));
+
+    if (player.position.y > RESPAWN_Y_THRESHOLD) {
+      player.position = { x: 100, y: 400 };
+      player.velocity = { x: 0, y: 0 };
+      player.isJumping = false;
+    }
   }
 
-  private applyGravity(player: Player) {
-    player.velocity.y += GRAVITY;
+  private applyGravity(player: Player, deltaTime: number) {
+    player.velocity.y += GRAVITY * deltaTime;
     if (player.velocity.y > MAX_FALL_SPEED) {
       player.velocity.y = MAX_FALL_SPEED;
     }
@@ -84,10 +94,8 @@ export class Physics {
     );
   }
 
-  private updateCamera(camera: Vec2, player: Player) {
-    const targetX = player.position.x - 300;
-    camera.x = targetX;
-
-    if (camera.x < 0) camera.x = 0;
+  private updateCamera(camera: Vec2, player: Player, canvasWidth: number) {
+    const targetX = player.position.x - canvasWidth / 2;
+    camera.x = Math.max(0, targetX);
   }
 }
