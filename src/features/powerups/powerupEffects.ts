@@ -28,10 +28,14 @@ export function applyPowerUp(
 }
 
 export function removePowerUp(player: Character): Character {
+  // Only reset health if the power-up was a Mushroom (which increases max health)
+  // Star and Fire Flower don't affect health, so we preserve it
+  const shouldResetHealth = player.powerUpState === PowerUpType.Mushroom;
+
   return {
     ...player,
     powerUpState: null,
-    maxHealth: 1,
-    health: 1,
+    maxHealth: shouldResetHealth ? 1 : player.maxHealth,
+    health: shouldResetHealth ? Math.min(player.health, 1) : player.health,
   };
 }

@@ -12,7 +12,6 @@ export function useGameLoop({
   isPaused = false,
 }: GameLoopOptions) {
   const frameRef = useRef<number>();
-  const lastTimeRef = useRef<number>(0);
   const fpsInterval = 1000 / fps;
 
   useEffect(() => {
@@ -24,7 +23,6 @@ export function useGameLoop({
     }
 
     let then = Date.now();
-    lastTimeRef.current = then;
 
     const gameLoop = () => {
       frameRef.current = requestAnimationFrame(gameLoop);

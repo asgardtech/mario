@@ -24,8 +24,8 @@ export function createPlayer(): Character {
 
 export function updatePlayer(
   player: Character,
-  controls: Controls,
-  deltaTime: number
+  _controls: Controls,
+  _deltaTime: number
 ): Character {
   // TODO: Implement player movement logic based on controls and physics
   // - Apply horizontal movement based on controls.left/right
