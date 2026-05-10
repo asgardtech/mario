@@ -15,10 +15,17 @@ export interface Player extends GameObject {
   isGrounded: boolean;
 }
 
+export enum GameStateType {
+  MENU = 'MENU',
+  PLAYING = 'PLAYING',
+  PAUSED = 'PAUSED',
+}
+
 export interface GameState {
   player: Player;
   level: Level;
   isRunning: boolean;
+  state: GameStateType;
   score: number;
 }
 

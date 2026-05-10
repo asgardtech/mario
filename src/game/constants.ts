@@ -16,3 +16,4 @@ export const PHYSICS = {
 
 export const FPS = 60;
 export const FRAME_TIME = 1000 / FPS;
+export const MAX_DELTA = 250; // Maximum delta time in ms to prevent spiral of death

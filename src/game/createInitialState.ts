@@ -1,4 +1,4 @@
-import { GameState } from "./types";
+import { GameState, GameStateType } from "./types";
 import { PLAYER, CANVAS_WIDTH, CANVAS_HEIGHT } from "./constants";
 
 export function createInitialState(): GameState {
@@ -22,6 +22,7 @@ export function createInitialState(): GameState {
       ],
     },
     isRunning: false,
+    state: GameStateType.MENU,
     score: 0,
   };
 }
