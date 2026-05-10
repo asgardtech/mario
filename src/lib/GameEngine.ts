@@ -10,6 +10,7 @@ export class GameEngine {
   private readonly MAX_FALL_SPEED = 800; // pixels per second
   private readonly COYOTE_TIME = 100; // milliseconds
   private readonly VARIABLE_JUMP_CUT = 0.5; // Cut jump velocity to 50% when released early
+  private readonly CROUCH_HEIGHT_RATIO = 0.6; // Crouch height is 60% of normal height
 
   public updatePlayer(
     player: Player,
@@ -38,8 +39,23 @@ export class GameEngine {
       !updated.isGrounded &&
       currentTime - updated.lastGroundedTime <= this.COYOTE_TIME;
 
-    // Handle crouch state
+    // Handle crouch state and adjust collision box
+    const wasCrouching = player.isCrouching;
     updated.isCrouching = input.crouch && updated.isGrounded;
+
+    // Adjust height and position when transitioning to/from crouch
+    if (updated.isCrouching && !wasCrouching) {
+      // Transitioning to crouch - shrink height and adjust position to maintain foot position
+      const newHeight = updated.normalHeight * this.CROUCH_HEIGHT_RATIO;
+      const heightDiff = updated.height - newHeight;
+      updated.height = newHeight;
+      updated.position.y += heightDiff; // Move down to keep feet at same position
+    } else if (!updated.isCrouching && wasCrouching) {
+      // Transitioning from crouch to standing - restore normal height
+      const heightDiff = updated.normalHeight - updated.height;
+      updated.height = updated.normalHeight;
+      updated.position.y -= heightDiff; // Move up to keep feet at same position
+    }
 
     // Apply horizontal movement (disabled when crouching)
     if (!updated.isCrouching) {

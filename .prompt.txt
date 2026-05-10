@@ -1,0 +1,1412 @@
+You are an autonomous coding agent. Your pull request #13 received review feedback and needs changes.
+
+## Original Issue #4: Implement player input and control
+
+(no description)
+
+## Review Feedback
+
+**viovanov:**
+# Code Review: PR #13 - Implement Player Input and Control
+
+## Overview
+This PR implements a basic platformer game with player input handling, physics simulation, and collision detection. The implementation includes keyboard controls (arrow keys/WASD), jumping mechanics, gravity, and platform interactions.
+
+## What Works Well
+
+### ✅ Input Controller (`src/lib/InputController.ts`)
+- Clean implementation with proper event listener attachment/detachment
+- Supports multiple key bindings (Arrow keys, WASD)
+- Correctly calls `preventDefault()` to prevent page scrolling
+- Returns a copy of the input state (good defensive programming)
+- Proper cleanup in `detach()` method
+
+### ✅ Game Component (`src/components/Game.tsx`)
+- Well-structured React component with proper hooks usage
+- Cleanup properly handled in useEffect return function
+- Nice visual touches (grass on platforms, player eyes, controls info)
+- Good UX with start/stop functionality
+
+### ✅ Type Definitions (`src/types/game.ts`)
+- Clean, well-defined TypeScript interfaces
+- Appropriate separation of concerns
+
+## Issues Found
+
+### 🔴 Critical: Collision Detection Logic Error
+
+**Location:** `src/lib/GameEngine.ts:8246-8250`
+
+The condition for detecting landing on top of a platform is incorrect:
+
+```typescript
+if (
+  updated.velocity.y > 0 &&
+  updated.position.y + updated.height <= platform.y + updated.velocity.y
+) {
+```
+
+**Problem:** This condition checks if `player.bottom <= platform.top + velocity`, which doesn't correctly determine if the player crossed the platform boundary during this frame. The position has already been updated (line 8232), so this check is comparing the new position against itself plus another velocity step.
+
+**Impact:** 
+- May cause inconsistent collision behavior
+- Players could potentially clip through platforms when moving at certain speeds
+- Collision resolution might trigger at wrong times
+
+**Suggested Fix:**
+```typescript
+// Calculate previous position before velocity was applied
+const prevY = updated.position.y - updated.velocity.y;
+
+if (
+  updated.velocity.y > 0 &&
+  prevY + updated.height <= platform.y &&
+  updated.position.y + updated.height >= platform.y
+) {
+  updated.position.y = platform.y - updated.height;
+  updated.velocity.y = 0;
+  updated.isGrounded = true;
+}
+```
+
+This checks if the player WAS above the platform in the previous frame and is NOW at or below it.
+
+### ⚠️ Minor Issues
+
+1. **Side collision resolution** (lines 8263-8269): The else clause handles side collisions, but this could incorrectly trigger for diagonal approaches. Consider checking which side was hit based on overlap amounts.
+
+2. **No upward velocity cap**: Gravity caps falling speed (`MAX_FALL_SPEED`) but there's no cap on upward velocity, though this is less critical for typical gameplay.
+
+## Testing Recommendations
+
+Before merging, please test:
+1. **Fast falling:** Jump from the highest platform and verify the player doesn't clip through platforms below
+2. **Edge cases:** Approach platforms from various angles (steep falls, diagonal movement)
+3. **Rapid jumping:** Spam the jump key near platform edges
+4. **Side collisions:** Walk into platform sides at various heights
+
+## Completeness Check
+
+Against Issue #4 requirements:
+- ✅ Player input handling (keyboard)
+- ✅ Character movement (left/right)
+- ✅ Jumping mechanics
+- ✅ Physics simulation (gravity)
+- ✅ Collision detection (implemented but buggy)
+- ✅ Platform interactions
+
+## Verdict
+
+The implementation provides a solid foundation and demonstrates understanding of game development concepts. However, the collision detection bug is significant enough that it should be fixed before merging to avoid gameplay issues.
+
+**Required Changes:**
+1. Fix the platform landing collision detection logic as described above
+2. Test the collision behavior thoroughly with the suggested test cases
+
+Once these changes are made, the PR will be ready to merge.
+
+---
+
+**viovanov:**
+## Automated Code Review
+
+## Review Complete
+
+I've analyzed PR #13 which implements player input and control for the Mario platformer game. Here's my assessment:
+
+### Summary
+
+The PR successfully implements the core requirements:
+- ✅ Keyboard input handling (Arrow keys, WASD, Space)
+- ✅ Player movement (left/right)
+- ✅ Jumping mechanics
+- ✅ Physics simulation with gravity
+- ✅ Platform collision detection
+- ✅ Clean code structure with proper TypeScript types
+
+### Critical Issue Found
+
+**Collision Detection Bug** in `src/lib/GameEngine.ts` (lines 246-250):
+
+The condition for detecting when a player lands on a platform is incorrect:
+```typescript
+updated.position.y + updated.height <= platform.y + updated.velocity.y
+```
+
+This checks the wrong frame's position because the position has already been updated. The correct approach should calculate where the player was in the previous frame to determine if they crossed the platform boundary.
+
+**Impact:** This bug could cause players to clip through platforms or experience inconsistent collision behavior, especially when falling at high speeds.
+
+### Recommendation
+
+The implementation demonstrates solid understanding of game development concepts and provides a good foundation. However, the collision detection bug is significant enough to warrant fixing before merge to ensure reliable gameplay.
+
+The review has been posted as a comment at: https://github.com/asgardtech/mario/pull/13#issuecomment-4415182590
+
+**VERDICT: CHANGES_REQUESTED**
+
+---
+
+**viovanov:**
+## Rework — No Changes
+
+The rework agent reviewed the feedback but did not make additional changes.
+Moving issue back to **In review** for re-evaluation.
+
+---
+
+**viovanov:**
+# Code Review: PR #13 - Implement Player Input and Control
+
+## Summary
+This PR implements a basic player input and control system for a platformer game. The implementation includes keyboard input handling, physics simulation with gravity and jumping, and platform collision detection. While the core functionality is present, there are several issues that need to be addressed.
+
+## ✅ What Works Well
+
+1. **Clean Architecture**: The code is well-organized with separation of concerns:
+   - `InputController.ts` handles keyboard events
+   - `GameEngine.ts` manages physics and collision logic
+   - `Game.tsx` orchestrates the game loop and rendering
+   - `types/game.ts` provides clear TypeScript interfaces
+
+2. **Input Handling**: The `InputController` properly:
+   - Supports both arrow keys and WASD
+   - Calls `preventDefault()` to avoid page scrolling
+   - Cleans up event listeners on detach
+   - Uses proper binding for event handlers
+
+3. **Basic Physics**: Gravity, jumping, and horizontal movement are implemented with reasonable constants.
+
+## 🐛 Issues Found
+
+### Critical Issues
+
+#### 1. **Collision Detection Logic Flaw** (GameEngine.ts:8244-8277)
+The collision resolution has a problematic "else" clause that doesn't properly distinguish between side collisions and vertical collisions:
+
+```typescript
+// Hitting side of platform
+else {
+  if (updated.velocity.x > 0) {
+    updated.position.x = platform.x - updated.width;
+  } else if (updated.velocity.x < 0) {
+    updated.position.x = platform.x + platform.width;
+  }
+  updated.velocity.x = 0;
+}
+```
+
+**Problem**: This assumes any collision that isn't landing on top or hitting the bottom must be a side collision, but this isn't always true. A player could be moving horizontally while also colliding vertically, leading to incorrect collision resolution.
+
+**Impact**: Player may experience glitchy behavior when approaching platforms at angles or from certain positions.
+
+**Suggested Fix**: Add proper overlap calculations to determine the collision direction based on the smallest penetration depth.
+
+#### 2. **Jump Input Allows Key Holding** (InputController.ts:8334-8338)
+The jump key remains `true` as long as it's held down. Combined with the jump check in GameEngine (line 8217: `if (input.jump && updated.isGrounded)`), this creates unintended behavior:
+
+```typescript
+case "Space":
+case "KeyW":
+case "ArrowUp":
+  this.keys.jump = true;  // Stays true while held
+  event.preventDefault();
+  break;
+```
+
+**Problem**: Players can spam jump by holding the key when landing, which is typically not desired in precise platformers. Most platformers require releasing and re-pressing the jump key.
+
+**Impact**: Affects game feel and player control precision.
+
+**Suggested Fix**: Implement jump buffering or require the jump key to be released before allowing another jump.
+
+### Medium Issues
+
+#### 3. **Missing Delta Time** (Game.tsx:8081-8138)
+The game loop doesn't use delta time for physics calculations:
+
+```typescript
+const gameLoop = () => {
+  const input = inputController.getInputState();
+  player = gameEngine.updatePlayer(player, input, platforms, CANVAS_WIDTH);
+  // ...
+  animationFrameId = requestAnimationFrame(gameLoop);
+};
+```
+
+**Problem**: Game speed is tied to frame rate. On faster displays (120Hz+) or slower devices, the game will run at different speeds.
+
+**Impact**: Inconsistent gameplay experience across different devices.
+
+**Suggested Fix**: Calculate delta time and pass it to the physics updates.
+
+#### 4. **Corner Case: Multi-Platform Collision** (GameEngine.ts:8243-8277)
+The collision loop processes platforms sequentially:
+
+```typescript
+for (const platform of platforms) {
+  if (this.checkCollision(updated, platform)) {
+    // collision resolution...
+  }
+}
+```
+
+**Problem**: If the player touches two platforms simultaneously (e.g., landing on a corner), both collisions are resolved sequentially, which can cause jittering or incorrect final position.
+
+**Impact**: Player may get stuck or experience glitchy movement at platform corners.
+
+### Minor Issues
+
+#### 5. **Excessive Dependencies** (package-lock.json)
+The PR adds 8,341 lines to `package-lock.json` with many UI libraries (@radix-ui components, React Hook Form, Supabase, TanStack Query, etc.).
+
+**Problem**: Most of these dependencies don't appear to be used for the platformer game. This creates unnecessary bloat.
+
+**Impact**: Larger bundle size, longer install times, increased security surface area.
+
+**Question**: Are these dependencies needed for other parts of the project, or were they added unintentionally?
+
+#### 6. **PR Description Inaccuracies**
+- Description mentions "level1.js" but platforms are hardcoded in Game.tsx
+- Description mentions "Game.js" and "types.d.ts" but actual files are "Game.tsx" and "types/game.ts"
+- These are minor documentation issues but should be corrected for clarity
+
+#### 7. **Hard-coded Canvas Size** (Game.tsx:8037-8038)
+Canvas dimensions are hard-coded constants:
+
+```typescript
+const CANVAS_WIDTH = 800;
+const CANVAS_HEIGHT = 600;
+```
+
+**Note**: While this works for the current implementation, consider making the game responsive in the future.
+
+## 📋 Testing Recommendations
+
+Based on the code review, please test these scenarios:
+
+1. **Collision Corners**: Move the player into the corner where two platforms meet and verify no glitching occurs
+2. **Jump Spamming**: Hold down the jump key while landing repeatedly - verify if this is the intended behavior
+3. **Side Collisions**: Approach platforms from the side while falling and verify correct collision response
+4. **Frame Rate**: Test on different refresh rate monitors (60Hz vs 120Hz) to check for speed inconsistencies
+
+## 🎯 Verdict Justification
+
+The PR successfully implements basic player input and control as specified in Issue #4. Players can:
+- ✅ Move left and right with arrow keys or WASD
+- ✅ Jump with space bar, W, or up arrow
+- ✅ Interact with platforms through collision detection
+- ✅ Experience basic physics (gravity, velocity)
+
+However, the collision detection has logical flaws that could lead to gameplay bugs, and the jump input handling may not provide the expected platformer feel. These issues should be addressed before merging.
+
+## 📝 Recommended Changes
+
+1. **Fix collision resolution logic** to properly determine collision direction
+2. **Implement proper jump buffering** or one-shot jump input
+3. **Add delta time** to physics calculations for consistent cross-device performance
+4. **Review and remove unused dependencies** from package.json
+5. **Add corner-case handling** for multi-platform collisions
+
+---
+
+**Overall Assessment**: The implementation provides a solid foundation but needs refinement in collision handling and input processing to ensure quality gameplay.
+
+---
+
+**viovanov:**
+## Automated Code Review
+
+## Review Complete
+
+I've reviewed PR #13 and posted my detailed analysis as a comment on the pull request.
+
+### Key Findings:
+
+**Positives:**
+- ✅ Clean code architecture with proper separation of concerns
+- ✅ Input handling supports arrow keys, WASD, and space bar
+- ✅ Basic physics (gravity, jumping, movement) implemented
+- ✅ TypeScript types properly defined
+
+**Critical Issues:**
+1. **Collision Detection Flaw**: The "else" clause in collision resolution (GameEngine.ts:8268-8275) doesn't properly distinguish between side collisions and vertical collisions, which can cause glitchy player behavior
+2. **Jump Input Problem**: Holding the jump key allows continuous jumping when landing, which typically isn't desired in platformers
+
+**Medium Issues:**
+3. Missing delta time - game speed varies with frame rate
+4. Multi-platform corner collisions not handled properly
+5. 8,341 lines added to package-lock.json with many unused dependencies
+
+**Minor Issues:**
+6. PR description mentions files that don't match the actual implementation
+7. Hard-coded canvas dimensions
+
+The implementation successfully delivers basic player input and control, but the collision detection bugs and jump input behavior need to be fixed to ensure quality gameplay.
+
+Review posted at: https://github.com/asgardtech/mario/pull/13#issuecomment-4415190037
+
+VERDICT: CHANGES_REQUESTED
+
+---
+
+**viovanov:**
+## Rework — No Changes
+
+The rework agent reviewed the feedback but did not make additional changes.
+Moving issue back to **In review** for re-evaluation.
+
+---
+
+**viovanov:**
+# Code Review: PR #13 - Implement Player Input and Control
+
+## Overview
+This PR implements a comprehensive player input and control system with keyboard handling, physics simulation, and collision detection. The implementation is well-structured with good separation of concerns across InputController, GameEngine, and Game components.
+
+## Critical Issues
+
+### 1. Collision Detection Bug - Previous Position Calculation
+**Location:** `src/lib/GameEngine.ts:59-60`
+
+The collision resolution logic calculates "previous position" incorrectly:
+
+```typescript
+const prevY = updated.position.y - updated.velocity.y * deltaTime;
+const prevX = updated.position.x - updated.velocity.x * deltaTime;
+```
+
+**Problem:** At this point, `updated.velocity.x` may have already been set to 0 by the horizontal movement logic (lines 24-26), so `prevX` won't accurately reflect where the player came from. This can cause incorrect collision side detection.
+
+**Solution:** Store the actual previous position before any updates:
+```typescript
+const prevPosition = { x: player.position.x, y: player.position.y };
+```
+
+Then use `prevPosition.x` and `prevPosition.y` in the collision checks instead of calculating backwards from modified velocity.
+
+### 2. Multi-Platform Collision Handling
+**Location:** `src/lib/GameEngine.ts:55-107`
+
+The collision loop processes all platforms but doesn't stop after resolving a collision. If the player is wedged between two platforms or in a corner, multiple collision resolutions could conflict, potentially causing the player to teleport or get stuck.
+
+**Recommendation:** Consider breaking out of the loop after resolving a collision, or implement a more sophisticated multi-collision resolution strategy.
+
+### 3. Missing Level File
+**Location:** PR Description vs Actual Changes
+
+The PR description mentions:
+> **level1.js**: A basic platformer level featuring multiple platforms for testing the new control features.
+
+This file is not present in the diff. Platforms are hardcoded in `Game.tsx` instead.
+
+**Impact:** Minor - the functionality works, but there's a discrepancy between the description and implementation.
+
+## Medium Issues
+
+### 4. Package Dependencies
+The `package-lock.json` includes 8,000+ lines of dependencies for UI libraries (@radix-ui/*, framer-motion, cmdk, etc.) that appear unrelated to "player input and control."
+
+**Question:** Are these from a template/scaffolding, or should they be in a separate PR?
+
+### 5. Type File Naming Inconsistency
+The PR description mentions "types.d.ts" but the actual file is "src/types/game.ts". This is fine functionally but inconsistent with the description.
+
+## Positive Aspects ✅
+
+1. **Excellent separation of concerns** - InputController, GameEngine, and Game component are cleanly separated
+2. **Frame-rate independent physics** - Proper use of deltaTime throughout
+3. **Robust input handling** - Jump buffering with `jumpPressed` flag prevents jump-holding exploit
+4. **Clean TypeScript types** - Well-defined interfaces for all game entities
+5. **Good physics constants** - Realistic gravity, jump force, and movement speed
+6. **Proper cleanup** - Event listeners are attached and detached correctly
+7. **User-friendly** - Start/stop buttons and on-screen debug info
+8. **Collision detection on all sides** - Handles top, bottom, left, and right collisions
+
+## Testing Recommendations
+
+Given the collision detection issue, please test:
+1. Jumping into platforms from below
+2. Running into walls from the side at high speed
+3. Landing on platform edges
+4. Being in the corner between two perpendicular platforms
+5. Jumping while moving horizontally
+
+## Verdict Summary
+
+The implementation successfully provides player input and control functionality as specified in issue #4. However, the collision detection bug could cause incorrect behavior in edge cases and should be fixed before merging. The multi-platform collision handling could also be improved for robustness.
+
+The code quality is generally high with good architecture and TypeScript usage. With the collision detection fix, this will be a solid foundation for the game.
+
+---
+
+**viovanov:**
+## Automated Code Review
+
+## Review Complete
+
+I've analyzed PR #13 and posted my detailed review as a comment on the pull request.
+
+### Summary
+
+The PR successfully implements player input and control with:
+- ✅ InputController for keyboard handling (Arrow keys, WASD, Space)
+- ✅ GameEngine with physics simulation and collision detection
+- ✅ Functional game loop with proper frame-rate independence
+- ✅ Clean TypeScript architecture with good separation of concerns
+
+### Key Issues Found
+
+**Critical:**
+1. **Collision detection bug** in `GameEngine.ts:59-60` - The "previous position" is calculated from already-modified velocity values, which can cause incorrect collision side detection
+2. **Multi-platform collision** - No handling for simultaneous collisions with multiple platforms
+
+**Medium:**
+3. Missing `level1.js` file mentioned in PR description
+4. Large unrelated package dependencies in package-lock.json
+
+The code quality is high overall with excellent architecture, but the collision detection issue could cause incorrect behavior in edge cases (player hitting platform corners, side collisions, etc.) and should be fixed before merging.
+
+**VERDICT: CHANGES_REQUESTED**
+
+---
+
+**viovanov:**
+## Rework — No Changes
+
+The rework agent reviewed the feedback but did not make additional changes.
+Moving issue back to **In review** for re-evaluation.
+
+---
+
+**viovanov:**
+# Code Review: PR #13 - Implement player input and control
+
+## Summary
+This PR implements a player input and control system for a Mario-style platformer game. The implementation includes keyboard input handling, physics simulation with gravity and jumping, and collision detection with platforms.
+
+## Architecture & Design ✅
+The code demonstrates good separation of concerns:
+- **InputController**: Clean abstraction for keyboard input
+- **GameEngine**: Physics and collision logic separated from rendering
+- **Game component**: React integration with proper lifecycle management
+- **Type definitions**: Well-defined interfaces for game entities
+
+## What Works Well ✅
+
+1. **Input Handling**: Support for both arrow keys and WASD, with proper event prevention
+2. **Jump Prevention**: The `jumpPressed` flag prevents continuous jumping while holding space
+3. **Frame-rate Independence**: Delta time-based physics ensures consistent behavior across different frame rates
+4. **Collision Detection**: Comprehensive collision resolution for all four sides of platforms
+5. **Resource Cleanup**: Proper event listener removal on component unmount
+6. **Visual Feedback**: Player color changes based on grounded state, faces direction of movement
+7. **Boundary Checking**: Player stays within canvas bounds horizontally
+
+## Critical Issues Found 🚨
+
+### 1. Jump Input Not Being Consumed (Game.tsx:61-63)
+
+**Location**: `src/components/Game.tsx:61-63`
+
+**Issue**: The jump input consumption logic has a critical flaw:
+
+```typescript
+if (input.jump && player.isGrounded) {
+  inputController.consumeJump();
+}
+```
+
+This check happens AFTER `updatePlayer()` executes. When a jump is successfully applied in the engine (line 34-37 of GameEngine.ts), `isGrounded` is immediately set to `false`. This means:
+
+1. Player lands while holding space
+2. `updatePlayer()` sees `input.jump && isGrounded` → applies jump and sets `isGrounded = false`
+3. Line 61 checks `input.jump && player.isGrounded` → but `isGrounded` is now `false`!
+4. `consumeJump()` is NEVER called
+5. The jump input persists, causing the player to jump again on the next landing
+
+**Impact**: Player will continuously jump on every landing while holding the space bar, despite the `jumpPressed` flag attempting to prevent this.
+
+**Fix**: Capture grounded state before the update, or unconditionally consume jump input:
+
+```typescript
+// Option 1: Check previous state
+const wasGrounded = player.isGrounded;
+player = gameEngine.updatePlayer(player, input, platforms, CANVAS_WIDTH, deltaTime);
+if (input.jump && wasGrounded) {
+  inputController.consumeJump();
+}
+
+// Option 2: Always consume (simpler)
+player = gameEngine.updatePlayer(player, input, platforms, CANVAS_WIDTH, deltaTime);
+if (input.jump) {
+  inputController.consumeJump();
+}
+```
+
+## Minor Issues ⚠️
+
+### 2. Collision Resolution Priority (GameEngine.ts:84, 94, 103, 112)
+
+The code uses `break` statements after resolving each collision, processing only the first platform that collides with the player. In scenarios where the player collides with multiple platforms simultaneously (e.g., landing in a corner), the order of platform iteration determines which collision is resolved. This could lead to unexpected behavior in edge cases.
+
+**Recommendation**: This may be acceptable for a simple platformer, but consider tracking the "best" collision to resolve (e.g., the one with smallest overlap or most relevant to player velocity direction).
+
+### 3. Delta Time Capping (Game.tsx:53)
+
+The delta time is capped at 0.1s (100ms). While this prevents physics explosions, it means the game will run in slow motion if frame rate drops below 10 FPS, and physics will be incorrect if the tab is backgrounded for extended periods.
+
+**Recommendation**: Consider adding a maximum accumulator or pausing the game when tab loses focus.
+
+## Testing Recommendations
+
+- [ ] Verify the jump consumption bug by holding space and observing repeated jumps
+- [ ] Test corner collisions (player landing between two platforms)
+- [ ] Test edge cases: jumping at platform edge, walking off platforms
+- [ ] Verify physics consistency at different frame rates
+- [ ] Test with tab backgrounding/foregrounding
+
+## Completeness Assessment
+
+For Issue #4 "Implement player input and control", the PR delivers:
+- ✅ Player movement (left/right)
+- ✅ Jumping mechanics
+- ✅ Keyboard input handling (arrow keys, WASD, space)
+- ✅ Basic physics and collision detection
+
+The core functionality is present, but the critical jump bug must be fixed before merge.
+
+## Verdict
+
+The implementation demonstrates solid engineering practices with clean architecture and good separation of concerns. However, the jump input consumption bug is a critical gameplay issue that will cause frustrating behavior for players. Once this bug is fixed, the PR will successfully implement the required player input and control system.
+
+---
+
+**viovanov:**
+## Automated Code Review
+
+## Review Complete
+
+I've thoroughly reviewed PR #13 and posted my detailed analysis as a comment on the pull request.
+
+### Key Findings:
+
+**✅ Strengths:**
+- Clean architecture with good separation of concerns (InputController, GameEngine, Game component)
+- Proper keyboard input handling with support for arrow keys and WASD
+- Frame-rate independent physics using delta time
+- Comprehensive collision detection and resolution
+- Good resource cleanup and React lifecycle management
+
+**🚨 Critical Bug Found:**
+
+The jump input consumption logic in `Game.tsx:61-63` has a critical flaw. The code checks `player.isGrounded` AFTER calling `updatePlayer()`, but the engine sets `isGrounded = false` when applying a jump. This means `consumeJump()` is never called, causing the player to continuously bounce when holding the space bar.
+
+**Fix required:**
+```typescript
+// Capture state before update
+const wasGrounded = player.isGrounded;
+player = gameEngine.updatePlayer(player, input, platforms, CANVAS_WIDTH, deltaTime);
+if (input.jump && wasGrounded) {
+  inputController.consumeJump();
+}
+```
+
+The PR successfully implements the core requirements of Issue #4 (player movement, jumping, keyboard controls), but this bug significantly impacts gameplay and must be fixed before merging.
+
+**VERDICT: CHANGES_REQUESTED**
+
+---
+
+**viovanov:**
+# Code Review: PR #13 - Implement Player Input and Control
+
+## Summary
+This PR successfully implements a comprehensive player input and control system for the Mario-like platformer game. The implementation includes keyboard input handling, physics simulation with gravity and jumping, and collision detection with platforms.
+
+## Code Quality: ✅ Excellent
+
+### Strengths
+
+**1. Well-Structured Architecture**
+- Clear separation of concerns: `InputController` for input, `GameEngine` for physics, `Game` component for rendering
+- Proper TypeScript type definitions in `src/types/game.ts`
+- Clean, readable code with appropriate abstractions
+
+**2. InputController (`src/lib/InputController.ts`)**
+- ✅ Supports both arrow keys and WASD controls as expected for accessibility
+- ✅ Proper event listener lifecycle management (attach/detach)
+- ✅ Jump hold prevention using `jumpPressed` flag - prevents continuous jumping by holding the key
+- ✅ `preventDefault()` on handled keys to avoid unwanted scrolling
+
+**3. GameEngine (`src/lib/GameEngine.ts`)**
+- ✅ Frame-rate independent physics using `deltaTime` - excellent practice
+- ✅ Proper AABB collision detection algorithm
+- ✅ Sophisticated collision resolution using overlap calculations and previous position tracking
+- ✅ Handles all four collision directions (top, bottom, left, right) correctly
+- ✅ Max fall speed cap prevents unrealistic acceleration
+- ✅ Player kept within canvas boundaries
+
+**4. Game Component (`src/components/Game.tsx`)**
+- ✅ Proper React hooks usage with cleanup in `useEffect`
+- ✅ No memory leaks - event listeners and animation frames are cleaned up
+- ✅ Helpful debug information displayed (position, grounded state)
+- ✅ User-friendly start/stop game controls
+- ✅ `deltaTime` capped at 0.1s to prevent physics explosions on tab switches
+
+**5. Physics Constants**
+- ✅ Realistic values (gravity: 980px/s², jump: -600px/s, movement: 250px/s)
+- ✅ Feels responsive and arcade-like, appropriate for a Mario-style game
+
+## Implementation Correctness: ✅ Verified
+
+**Collision Detection Logic:**
+The AABB collision check is correctly implemented:
+```typescript
+player.position.x < platform.x + platform.width &&
+player.position.x + player.width > platform.x &&
+player.position.y < platform.y + platform.height &&
+player.position.y + player.height > platform.y
+```
+
+**Collision Resolution Logic:**
+- Uses minimum overlap to determine collision side
+- Validates collision direction using previous position and velocity
+- Prevents tunneling through platforms
+- Properly sets `isGrounded` only when landing on top of platforms
+
+**Jump Mechanics:**
+The jump consumption logic is correct:
+```typescript
+const wasGrounded = player.isGrounded;
+player = gameEngine.updatePlayer(player, input, platforms, CANVAS_WIDTH, deltaTime);
+if (input.jump && wasGrounded) {
+  inputController.consumeJump();
+}
+```
+
+## Minor Observations (Not Blocking)
+
+1. **Jump Buffering Behavior**: If a player presses and holds jump while in the air, they will automatically jump on the frame they land. This allows a form of "jump buffering" - which is actually a feature in many modern platformers (including newer Mario games) and improves responsiveness. If this is unintended, the `consumeJump()` could be called unconditionally after each frame.
+
+2. **Single Collision Resolution**: The code breaks after resolving the first collision per frame. For most platformer scenarios this is fine and prevents complex multi-collision edge cases. Only unusual level designs with very tight platform arrangements might see issues.
+
+3. **Instant Movement Stop**: No horizontal momentum/deceleration - character stops immediately when keys are released. This matches classic Mario physics and is likely intentional.
+
+## Testing Recommendations
+
+The PR description includes good testing notes. I recommend specifically testing:
+- [ ] Jumping while moving left/right to verify combined inputs work
+- [ ] Landing on platform edges to verify collision boundaries
+- [ ] Rapid left-right direction changes
+- [ ] Hitting platforms from the side while falling
+- [ ] Hitting the bottom of platforms while jumping
+- [ ] Canvas boundary conditions at x=0 and x=800
+
+## Verdict
+
+This is a high-quality implementation that correctly addresses Issue #4. The code demonstrates solid software engineering practices, proper TypeScript usage, correct physics simulation, and robust collision detection. The implementation is complete, well-tested, and ready for merge.
+
+**No changes required.**
+
+---
+
+**viovanov:**
+## Automated Code Review
+
+## Review Complete ✅
+
+I've completed a thorough review of PR #13 implementing player input and control for the Mario game.
+
+### Key Findings:
+
+**Architecture & Implementation:**
+- Well-structured separation of concerns (InputController, GameEngine, Game component)
+- Frame-rate independent physics using deltaTime
+- Correct AABB collision detection with sophisticated resolution logic
+- Proper React lifecycle management with no memory leaks
+- Support for both arrow keys and WASD controls
+
+**Correctness:**
+- Collision detection algorithm is correct
+- Physics simulation works properly with gravity, jumping, and velocity
+- Jump mechanics prevent holding to spam jumps
+- Player boundaries are enforced
+- All four collision directions (top, bottom, left, right) handled correctly
+
+**Minor Observations (non-blocking):**
+- Jump buffering is possible (holding jump in air → auto-jump on landing), which is actually common in modern platformers
+- Instant stop when releasing movement keys (matches classic Mario)
+- Single collision per frame (appropriate for platformer games)
+
+The implementation is complete, high-quality, and correctly addresses Issue #4. Review has been posted to the PR at: https://github.com/asgardtech/mario/pull/13#issuecomment-4415216838
+
+**VERDICT: APPROVED**
+
+---
+
+**viovanov:**
+# QA Test Results for PR #13 - Implement Player Input and Control
+
+**Issue Reference:** #4  
+**Test Date:** 2026-05-10  
+**Tester:** QA Automation (Claude Code)
+
+## Executive Summary
+
+❌ **OVERALL RESULT: FAIL**
+
+**Test Results:** 29 passed, 15 failed out of 44 total tests
+
+The implementation provides **basic** player input and movement functionality, but is **missing critical features** specified in the acceptance criteria. While fundamental movement and jumping work, the implementation lacks:
+- Variable jump height
+- Jump buffering
+- Coyote time
+- Sprint mechanics (Shift modifier)
+- Crouch mechanics (ArrowDown)
+- Focus loss handling (stuck keys prevention)
+- Last-input-wins for conflicting directional inputs
+
+Additionally, the **physics constants differ** from specifications (jump force: -600 vs -400 expected, move speed: 250 vs 200 expected).
+
+---
+
+## Acceptance Criteria Test Results
+
+### ✅ AC1: Horizontal Movement (PARTIAL PASS)
+**Status:** PASS (with deviation)
+
+- ✅ ArrowRight increases horizontal velocity
+- ✅ ArrowLeft increases horizontal velocity (negative)
+- ⚠️ **DEVIATION:** Implementation uses 250 units/s instead of specified 200 units/s
+- ✅ Alternative keys (WASD) work correctly
+
+**Findings:**
+- Movement works but at different speed than specified
+- No horizontal acceleration curve (instant full speed)
+
+### ✅ AC2: Basic Jump (PARTIAL PASS)
+**Status:** PASS (with deviation)
+
+- ✅ Space bar triggers jump when grounded
+- ✅ Player enters jumping state (isGrounded = false)
+- ⚠️ **DEVIATION:** Jump force is -600 units/s instead of specified -400 units/s
+- ✅ Cannot double jump (jump only works when grounded)
+
+**Findings:**
+- Basic jump mechanics work correctly
+- Jump force is 50% stronger than specification
+
+### ❌ AC3: Variable Jump Height
+**Status:** FAIL
+
+**Expected:** Releasing Space before jump apex should cut upward velocity by 50%  
+**Actual:** No variable jump height implemented
+
+**Test Evidence:**
+```
+Expected: velocity -400 → -200 (50% cut)
+Actual: velocity -400 → -383 (only gravity applied)
+```
+
+**Impact:** Players cannot perform short hops or control jump height, reducing gameplay precision.
+
+### ❌ AC4: Jump Buffering
+**Status:** FAIL (NOT IMPLEMENTED)
+
+**Expected:** Pressing Space 5 frames before landing should execute jump immediately upon landing  
+**Actual:** Feature completely missing
+
+**Missing Implementation:**
+- No input timestamp tracking
+- No buffer window (expected: 6 frames / 100ms)
+- No pre-landing jump queue
+
+**Impact:** Tight platforming sequences will feel unresponsive. Players must time jumps perfectly with ground contact.
+
+### ❌ AC5: Coyote Time
+**Status:** FAIL (NOT IMPLEMENTED)
+
+**Expected:** Player can jump within 100ms after walking off platform edge  
+**Actual:** Feature completely missing
+
+**Missing Implementation:**
+- No "last grounded time" tracking
+- No coyote time window (expected: 6 frames / 100ms)
+- Jump immediately fails when leaving platform
+
+**Impact:** Walking off edges feels punishing. Classic platformer "forgiveness" mechanic is absent.
+
+### ❌ AC6: Sprint Mechanics
+**Status:** FAIL (NOT IMPLEMENTED)
+
+**Expected:** Holding Shift while moving multiplies speed by 1.5×  
+**Actual:** No sprint functionality exists
+
+**Missing Implementation:**
+- InputState has no `sprint` property
+- No Shift key detection
+- No speed multiplier logic
+
+**Impact:** Players have only one movement speed, reducing gameplay depth and speedrun potential.
+
+### ❌ AC7: Crouch Mechanics
+**Status:** FAIL (NOT IMPLEMENTED)
+
+**Expected:** Holding ArrowDown enters crouch state and disables horizontal movement  
+**Actual:** No crouch functionality exists
+
+**Missing Implementation:**
+- InputState has no `crouch` property
+- No ArrowDown detection
+- No crouch state in player
+- No horizontal movement restriction when crouching
+
+**Impact:** Cannot implement mechanics like ducking under obstacles or small passages.
+
+### ❌ AC8: Last-Input-Wins (Conflicting Directional Keys)
+**Status:** FAIL
+
+**Expected:** When both ArrowLeft and ArrowRight are pressed, most recent key takes precedence  
+**Actual:** Both keys can be true simultaneously, with left taking precedence in code order
+
+**Test Evidence:**
+```javascript
+// When both left=true and right=true
+Expected: velocity = 250 (right wins if pressed last)
+Actual: velocity = -250 (left wins due to code order)
+```
+
+**Impact:** Unpredictable behavior when keyboard rolling or transitioning between directions quickly.
+
+### ❌ AC9: Focus Loss Handling (Stuck Keys)
+**Status:** FAIL (NOT IMPLEMENTED)
+
+**Expected:** All input state cleared on window blur to prevent stuck keys  
+**Actual:** No blur event listener exists
+
+**Missing Implementation:**
+- No window blur event handler
+- Input state persists across focus loss
+- Keys remain "pressed" when refocusing
+
+**Impact:** CRITICAL BUG - Player can get stuck moving/jumping when tabbing back to game. This is a common source of player frustration.
+
+### ✅ AC10: Frame Independence
+**Status:** PARTIAL PASS
+
+- ✅ Delta time parameter exists and is used
+- ✅ Movement scales correctly with different frame rates (30-120 FPS)
+- ⚠️ **ISSUE:** Gravity application has minor inconsistencies with player already on ground
+- ✅ Just-pressed detection works (via jumpPressed flag)
+
+**Findings:**
+- Core frame independence is implemented
+- Some edge cases with grounded state and gravity timing
+
+---
+
+## Physics & Collision Tests
+
+### ✅ Gravity Application
+**Status:** PASS
+
+- ✅ Gravity applies when player is in air
+- ✅ Gravity uses delta time correctly
+- ✅ Max fall speed enforced (800 units/s)
+- ⚠️ Minor precision issues with grounded state transitions
+
+### ✅ Platform Collision Detection
+**Status:** PASS (mostly)
+
+- ✅ Landing on platform from above (sets isGrounded, stops velocity)
+- ✅ Horizontal canvas bounds respected
+- ⚠️ Hitting head on platform from below (velocity not stopped correctly)
+- ✅ Multiple platform handling
+
+**Issues Found:**
+- Collision resolution occasionally allows player to clip slightly into platforms
+- Upward collision doesn't always stop upward velocity cleanly
+
+### ✅ Boundary Constraints
+**Status:** PASS
+
+- ✅ Player cannot move beyond left edge (x=0)
+- ✅ Player cannot move beyond right edge (x=canvasWidth-playerWidth)
+- ✅ Boundary enforcement doesn't break physics
+
+---
+
+## Code Quality Observations
+
+### Strengths
+1. ✅ Clean separation of concerns (InputController vs GameEngine)
+2. ✅ TypeScript types properly defined
+3. ✅ Event listener cleanup in detach()
+4. ✅ Delta time support for frame independence
+5. ✅ Event.preventDefault() called to avoid browser conflicts
+
+### Weaknesses
+1. ❌ Missing 6 out of 10 acceptance criteria features
+2. ❌ No focus loss handling (potential stuck key bug)
+3. ❌ Physics constants don't match specification
+4. ❌ No input buffering system
+5. ❌ No state machine for player states (standing/jumping/crouching/etc.)
+6. ⚠️ Code is in `src/lib/` instead of specified `src/game/input/` directory structure
+
+---
+
+## Test Coverage
+
+**Total Tests:** 44  
+**Passed:** 29 (66%)  
+**Failed:** 15 (34%)
+
+### Test Breakdown by Category
+
+| Category | Passed | Failed | Coverage |
+|----------|--------|--------|----------|
+| Basic Movement | 4 | 0 | 100% |
+| Jump Input | 5 | 0 | 100% |
+| Key Release | 2 | 0 | 100% |
+| Advanced Input (Sprint/Crouch) | 0 | 3 | 0% |
+| Focus Loss | 0 | 1 | 0% |
+| Physics & Collision | 11 | 3 | 79% |
+| Frame Independence | 3 | 1 | 75% |
+| Advanced Movement (Coyote/Buffer) | 0 | 3 | 0% |
+| Edge Cases | 4 | 4 | 50% |
+
+---
+
+## Critical Blockers
+
+### 🚨 P0 - Must Fix Before Merge
+
+1. **Focus Loss Bug (AC9)**
+   - **Risk:** Stuck keys when tabbing away from browser
+   - **User Impact:** HIGH - Common user behavior
+   - **Fix:** Add window blur event listener to clear all input state
+
+2. **Missing Advanced Movement Features (AC4, AC5)**
+   - **Risk:** Game feels unresponsive and punishing
+   - **User Impact:** HIGH - Core gameplay feel
+   - **Fix:** Implement jump buffering and coyote time
+
+3. **No Variable Jump Height (AC3)**
+   - **Risk:** Limited player control
+   - **User Impact:** MEDIUM - Reduces precision platforming
+   - **Fix:** Detect jump release and cut upward velocity
+
+### ⚠️ P1 - Should Fix
+
+4. **Missing Sprint & Crouch (AC6, AC7)**
+   - **Risk:** Incomplete feature set
+   - **User Impact:** MEDIUM - Gameplay depth
+   - **Fix:** Add sprint and crouch to InputState and GameEngine
+
+5. **Physics Constants Mismatch**
+   - **Risk:** Gameplay tuning issues
+   - **User Impact:** LOW - Works but differs from spec
+   - **Fix:** Update JUMP_FORCE to -400, MOVE_SPEED to 200
+
+6. **Last-Input-Wins Not Implemented (AC8)**
+   - **Risk:** Unpredictable directional behavior
+   - **User Impact:** LOW-MEDIUM - Affects advanced play
+   - **Fix:** Track most recent directional key
+
+---
+
+## Recommendations
+
+### Before Merging (Required)
+1. ✅ Implement focus loss handling (blur event)
+2. ✅ Add jump buffering (100ms window)
+3. ✅ Add coyote time (100ms window)
+4. ✅ Implement variable jump height
+5. ✅ Add sprint mechanics (Shift key)
+6. ✅ Add crouch mechanics (ArrowDown key)
+7. ✅ Fix physics constants to match specification
+
+### After Merging (Follow-up)
+1. Improve collision resolution precision
+2. Add visual/audio feedback for input buffering
+3. Add telemetry for input lag measurement
+4. Consider state machine pattern for player states
+5. Move code to specified directory structure (src/game/input/)
+
+---
+
+## Test Files Created
+
+- ✅ `src/lib/InputController.test.ts` - 18 tests
+- ✅ `src/lib/GameEngine.test.ts` - 26 tests
+
+All test files have been committed to the repository for continuous integration.
+
+---
+
+## Conclusion
+
+While the PR provides **functional basic movement and jumping**, it implements only **~40% of the specified acceptance criteria**. The missing features significantly impact gameplay feel and player experience. 
+
+**Most critically**, the focus loss bug (AC9) is a **showstopper** that will cause player frustration in real-world usage.
+
+**RECOMMENDATION:** Request changes to implement missing features, especially:
+- Focus loss handling (critical bug)
+- Jump buffering & coyote time (core gameplay feel)
+- Variable jump height (player control)
+- Sprint & crouch (feature completeness)
+
+---
+
+**Test Artifacts:**
+- Test Suite: `npm test`
+- Test Coverage: Available via `npm test -- --coverage`
+- Continuous Integration: Tests will run on all future commits
+
+---
+
+**viovanov:**
+## Automated QA Report
+
+Perfect! I've completed the QA testing for PR #13. Here's the summary:
+
+## QA Test Results Summary
+
+**Test Execution:** 44 automated tests written and executed
+- ✅ **29 tests passed** (66%)
+- ❌ **15 tests failed** (34%)
+
+### What Works
+- Basic left/right movement (ArrowLeft, ArrowRight, WASD)
+- Basic jump mechanics (Space, W, ArrowUp)
+- Gravity and physics simulation
+- Platform collision detection
+- Frame-independent movement (delta time support)
+- Canvas boundary constraints
+
+### Critical Issues Found
+
+**🚨 P0 - Showstoppers:**
+1. **Focus Loss Bug (AC9)** - No blur event handler means keys can get stuck when tabbing away from browser
+2. **Missing Jump Buffering (AC4)** - No input buffering system for tight platforming
+3. **Missing Coyote Time (AC5)** - No grace period for jumping after leaving platform edges
+4. **No Variable Jump Height (AC3)** - Cannot control jump height by releasing Space early
+
+**⚠️ P1 - Missing Features:**
+5. **No Sprint Mechanics (AC6)** - Shift key not implemented
+6. **No Crouch Mechanics (AC7)** - ArrowDown not implemented
+7. **Last-Input-Wins Not Working (AC8)** - Conflicting directional keys behave unpredictably
+8. **Physics Constants Mismatch** - Jump force is -600 instead of -400, speed is 250 instead of 200
+
+### Test Artifacts
+- ✅ Test files committed: `src/lib/InputController.test.ts`, `src/lib/GameEngine.test.ts`
+- ✅ Full test report posted to PR: https://github.com/asgardtech/mario/pull/13#issuecomment-4415227250
+- ✅ Tests integrated into CI pipeline (`npm test`)
+
+### Conclusion
+The implementation provides functional basic movement but is **missing 60% of the specified acceptance criteria**. Most critically, the focus loss bug will cause player frustration in real-world usage. The missing advanced movement features (jump buffering, coyote time, variable jump height) severely impact gameplay feel and responsiveness.
+
+**VERDICT: CHANGES_REQUESTED**
+
+---
+
+**viovanov:**
+# Code Review: PR #13 - Implement player input and control
+
+## Overview
+This PR implements a comprehensive player input and control system with keyboard handling, physics simulation, and collision detection. The implementation includes many advanced features like jump buffering, coyote time, variable jump height, sprint, and crouch mechanics.
+
+## Strengths ✓
+
+1. **Well-structured code**: Clear separation of concerns with `InputController`, `GameEngine`, and `Game` components
+2. **Advanced input features**: Jump buffering (100ms), coyote time (100ms), and blur handler to prevent stuck keys
+3. **Delta-time based physics**: Proper frame-rate independent movement
+4. **Comprehensive input support**: WASD + Arrow keys + Space, with last-input-wins for conflicting directional inputs
+5. **Collision detection**: Handles all four sides (top, bottom, left, right) with proper resolution
+6. **TypeScript type safety**: Well-defined interfaces in `types/game.ts`
+7. **Good visual feedback**: Player color changes when airborne, eyes show direction, debug info displayed
+
+## Critical Bugs Found 🐛
+
+### 1. Variable Jump Height Applied Every Frame
+**Location**: `src/lib/GameEngine.ts:89-91`
+
+```typescript
+if (input.jumpReleased && updated.velocity.y < 0) {
+  updated.velocity.y *= this.VARIABLE_JUMP_CUT;
+}
+```
+
+**Problem**: The `jumpReleased` flag remains `true` from when the jump key is released until it's pressed again. This causes the velocity to be cut by 50% **every frame** after release, not just once.
+
+**Result**: 
+- Frame 1 after release: velocity × 0.5 = 50%
+- Frame 2 after release: velocity × 0.5 = 25%
+- Frame 3 after release: velocity × 0.5 = 12.5%
+- Player falls almost immediately after releasing jump
+
+**Fix**: Either consume the `jumpReleased` flag after applying the cut, or track whether the cut has already been applied for the current jump:
+
+```typescript
+// Option 1: Add jumpCutApplied tracking to Player type
+if (input.jumpReleased && updated.velocity.y < 0 && !updated.jumpCutApplied) {
+  updated.velocity.y *= this.VARIABLE_JUMP_CUT;
+  updated.jumpCutApplied = true;
+}
+// Reset jumpCutApplied when starting a new jump
+
+// Option 2: Make jumpReleased consumable like jump
+```
+
+### 2. Coyote Time Jump Not Consumed
+**Location**: `src/components/Game.tsx:72-76`
+
+```typescript
+const wasGrounded = player.isGrounded;
+player = gameEngine.updatePlayer(...);
+
+if (input.jump && wasGrounded) {
+  inputController.consumeJump();
+}
+```
+
+**Problem**: When jumping during coyote time (after walking off a platform), `wasGrounded` is `false`, so the jump input is never consumed. If the player lands quickly, they'll jump again immediately without releasing the key.
+
+**Scenario**:
+1. Player walks off platform → `isGrounded = false`, coyote time active
+2. Player presses jump → GameEngine applies jump (valid coyote time jump)
+3. `wasGrounded` is `false`, so jump isn't consumed
+4. Player lands quickly → `isGrounded = true`, `input.jump` still `true`
+5. Player immediately jumps again without releasing key
+
+**Fix**: GameEngine should return whether a jump was actually performed, or the consumption logic needs to handle all jump cases:
+
+```typescript
+const jumpResult = gameEngine.updatePlayer(...);
+
+if (jumpResult.jumpPerformed) {
+  inputController.consumeJump();
+}
+```
+
+## Minor Issues
+
+### 3. Crouch Collision Box Doesn't Match Visual
+**Location**: `src/components/Game.tsx:96-99`
+
+The visual height changes when crouching (60% of normal height), but the actual collision box in `player.height` remains unchanged. This creates a mismatch between what the player sees and the actual collision detection.
+
+**Suggestion**: Consider shrinking the collision box when crouching, or document this as intentional design (some platformers do this intentionally).
+
+## Testing Recommendations
+
+To verify the bugs:
+1. **Bug #1**: Jump and immediately release the jump key - the player should rise to ~50% of full jump height, but will likely barely leave the ground
+2. **Bug #2**: Walk off a platform and press jump during the brief coyote window, then land on another platform quickly - you may experience an unintended double jump
+
+## Verdict
+
+The implementation shows excellent software engineering with good architecture, proper cleanup, type safety, and many thoughtful features. However, the two critical gameplay bugs significantly impact the core mechanic (jumping) and must be fixed before merging.
+
+Once these bugs are resolved, this will be a solid foundation for the game's control system.
+
+---
+
+**CHANGES REQUESTED**: Please fix the variable jump height frame-stacking bug (#1) and the coyote time jump consumption bug (#2) before merging.
+
+---
+
+**viovanov:**
+## Automated Code Review
+
+## Review Complete
+
+I've reviewed PR #13 and posted my detailed analysis as a comment on the pull request.
+
+### Summary
+
+The PR implements a comprehensive player input and control system with many advanced features including jump buffering, coyote time, variable jump height, sprint, and crouch mechanics. The code is well-structured with good separation of concerns and TypeScript type safety.
+
+**However, I found 2 critical bugs:**
+
+1. **Variable Jump Height Bug**: The jump velocity is cut by 50% *every frame* after releasing the jump key (instead of just once), making short jumps nearly impossible. This happens because the `jumpReleased` flag isn't consumed after use.
+
+2. **Coyote Time Jump Consumption Bug**: Jumps performed during coyote time (after walking off a platform) aren't properly consumed, potentially causing unintended double jumps when landing quickly.
+
+Both bugs significantly impact the core jumping mechanic and need to be fixed before the PR can be merged.
+
+**VERDICT: CHANGES_REQUESTED**
+
+---
+
+**viovanov:**
+## Rework — No Changes
+
+The rework agent reviewed the feedback but did not make additional changes.
+Moving issue back to **In review** for re-evaluation.
+
+---
+
+**viovanov:**
+# Code Review: PR #13 - Implement Player Input and Control
+
+## Summary
+This PR implements a comprehensive player input and control system for a Mario-like platformer game. The implementation includes keyboard input handling, physics simulation, collision detection, and several advanced platformer mechanics.
+
+## What Was Implemented
+
+### Core Features ✓
+- **Input System**: Full keyboard support with WASD and Arrow keys
+- **Movement**: Left/right movement with sprint (Shift) modifier
+- **Jumping**: Space/W/Up arrow for jumping
+- **Crouching**: Down/S to crouch (disables horizontal movement)
+- **Physics Engine**: Gravity, velocity, and collision detection
+- **Platform Collision**: AABB collision detection with proper resolution from all sides
+
+### Advanced Features ✓
+- **Coyote Time**: 100ms grace period to jump after leaving a platform
+- **Jump Buffering**: 100ms window to press jump before landing
+- **Variable Jump Height**: Release jump early for shorter jumps
+- **Conflict Resolution**: When both left/right pressed, uses last key pressed
+- **Window Blur Handling**: Prevents stuck keys when window loses focus
+
+## Code Quality
+
+### Strengths
+1. **Well-Structured**: Clean separation between InputController, GameEngine, and rendering
+2. **Type Safety**: Comprehensive TypeScript definitions
+3. **Frame-Independent Physics**: Uses delta time for consistent behavior across frame rates
+4. **Proper Cleanup**: Event listeners and animation frames are properly disposed
+5. **Good UX Features**: Coyote time, jump buffering, and variable jump height make the game feel responsive
+
+### Issues Found
+
+#### 🔴 Critical: Crouch Collision Box Mismatch
+
+**Location**: `src/lib/GameEngine.ts` and `src/components/Game.tsx`
+
+**Problem**: When crouching, the visual representation shrinks to 60% height (Game.tsx:96-99), but the collision box (`player.height`) remains unchanged. This means:
+- The player looks smaller but collides at full height
+- Can't actually fit under low platforms despite appearing to crouch
+- Confusing and breaks gameplay expectations
+
+**Current Code**:
+```typescript
+// Game.tsx - visual only
+const visualHeight = player.isCrouching ? player.height * 0.6 : player.height;
+```
+
+**Fix Needed**: The collision box should actually shrink when crouching. Modify player height directly in GameEngine:
+
+```typescript
+// In GameEngine.ts updatePlayer(), before collision detection
+const CROUCH_HEIGHT_RATIO = 0.6;
+const NORMAL_HEIGHT = 48;
+
+if (updated.isCrouching) {
+  updated.height = NORMAL_HEIGHT * CROUCH_HEIGHT_RATIO;
+} else {
+  updated.height = NORMAL_HEIGHT;
+}
+```
+
+Then adjust position when transitioning to avoid clipping:
+```typescript
+// When standing up from crouch, adjust position to maintain foot position
+if (!updated.isCrouching && player.isCrouching) {
+  const heightDiff = NORMAL_HEIGHT - (NORMAL_HEIGHT * CROUCH_HEIGHT_RATIO);
+  updated.position.y -= heightDiff;
+}
+```
+
+#### ⚠️ Minor: Potential Multi-Platform Collision Issue
+
+**Location**: `src/lib/GameEngine.ts:173`
+
+The collision resolution breaks after the first platform collision. If the player is touching multiple platforms simultaneously (corner cases), only one collision is resolved. This could cause unexpected behavior in edge cases, though it's acceptable for typical platformer gameplay.
+
+**Recommendation**: Document this limitation or consider iterating through all platforms without breaking.
+
+#### ⚠️ Minor: Magic Numbers
+
+**Location**: Throughout the code
+
+Several hardcoded values that could be constants:
+- Canvas dimensions (800x600) in Game.tsx
+- Player dimensions (32x48) in Game.tsx:28-29
+- Visual crouch factor (0.6) in Game.tsx:96
+
+**Recommendation**: Extract to named constants at the top of the file for easier tuning.
+
+## Testing Recommendations
+
+1. **Test crouching under platforms**: Currently won't work due to collision box issue
+2. **Test corner collisions**: Verify behavior when hitting platform corners
+3. **Test rapid direction changes**: Verify last-key-wins logic works as expected
+4. **Test coyote time**: Jump shortly after walking off platforms
+5. **Test jump buffering**: Press jump slightly before landing
+6. **Test variable jump**: Release jump key at different heights
+
+## Completeness Assessment
+
+For Issue #4 "Implement player input and control":
+- ✅ Input handling implemented
+- ✅ Player control working
+- ✅ Physics and collision implemented
+- ✅ Advanced features exceed basic requirements
+- ❌ Crouch mechanic has collision bug
+
+## Verdict
+
+The implementation is impressive in scope and includes many polished features. However, the **crouch collision box mismatch is a functional bug** that breaks a core mechanic. The visual representation doesn't match the collision behavior, which would be immediately noticeable during gameplay testing.
+
+Once the crouch collision issue is fixed, this will be an excellent implementation that exceeds the basic requirements of the issue.
+
+## Required Changes
+
+1. Fix crouch collision box to match visual representation (see detailed fix above)
+
+## Optional Improvements
+
+1. Extract magic numbers to constants
+2. Consider handling multiple platform collisions
+3. Make canvas size responsive or configurable
+
+---
+
+Great work on implementing advanced features like coyote time and jump buffering! These really enhance the feel of the platformer. Just need to fix the crouch collision to make it functional.
+
+---
+
+**viovanov:**
+## Automated Code Review
+
+## Review Complete
+
+I've reviewed PR #13 and posted my detailed analysis. Here's the summary:
+
+**What's Good:**
+- Comprehensive implementation with keyboard input, physics, and collision detection
+- Advanced features like coyote time, jump buffering, and variable jump height
+- Clean code structure with proper TypeScript types
+- Frame-independent physics using delta time
+- Proper resource cleanup
+
+**Critical Issue Found:**
+The crouch mechanic has a **collision box mismatch bug**. When crouching, the player's visual representation shrinks to 60% height, but the collision box remains full height. This means:
+- The player can't actually fit under low platforms despite appearing smaller
+- Visual representation doesn't match gameplay behavior
+- Breaks the core crouch mechanic
+
+The fix is straightforward - the `player.height` property needs to actually change when crouching, not just the visual rendering.
+
+**Review posted at:** https://github.com/asgardtech/mario/pull/13#issuecomment-4415249629
+
+VERDICT: CHANGES_REQUESTED
+
+Instructions:
+1. Read the review feedback above carefully.
+2. Address each piece of feedback by modifying the code.
+3. Commit your changes with a clear message referencing the feedback.
+4. Do NOT create a new PR -- your commits will be pushed to the existing branch.
+5. Do NOT include "Closes #" or "Fixes #" in commit messages — the issue lives on a separate project board.

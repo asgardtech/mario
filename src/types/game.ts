@@ -8,6 +8,7 @@ export interface Player {
   velocity: Vector2;
   width: number;
   height: number;
+  normalHeight: number; // Store the original height for crouch/uncrouch transitions
   isGrounded: boolean;
   isFacingRight: boolean;
   isCrouching: boolean;
