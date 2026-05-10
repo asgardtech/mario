@@ -1,6 +1,7 @@
-import { useEffect, useRef } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import type { GameState } from '@/types';
 import { GAME_CONFIG } from '@/constants';
+import { useGameLoop } from '@/hooks';
 
 interface GameEngineProps {
   onGameStateChange?: (state: GameState) => void;
@@ -8,30 +9,32 @@ interface GameEngineProps {
 
 export function GameEngine({ onGameStateChange }: GameEngineProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [isPaused, setIsPaused] = useState(false);
 
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
+  const handleUpdate = useCallback(
+    (deltaTime: number) => {
+      const canvas = canvasRef.current;
+      if (!canvas) return;
 
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        console.error('Failed to get 2D context for game canvas');
+        return;
+      }
 
-    let animationFrameId: number;
-
-    const gameLoop = () => {
       // TODO: Implement game loop logic:
-      // 1. Update game state (player, enemies, collisions)
+      // 1. Update game state (player, enemies, collisions) using deltaTime
       // 2. Render entities using ctx
       // 3. Call onGameStateChange with updated state
-      animationFrameId = requestAnimationFrame(gameLoop);
-    };
+    },
+    [onGameStateChange]
+  );
 
-    gameLoop();
-
-    return () => {
-      cancelAnimationFrame(animationFrameId);
-    };
-  }, [onGameStateChange]);
+  useGameLoop({
+    onUpdate: handleUpdate,
+    fps: GAME_CONFIG.FPS,
+    isPaused,
+  });
 
   return (
     <canvas

@@ -9,6 +9,7 @@ export function useGameControls(): Controls {
     jump: false,
     run: false,
     action: false,
+    pause: false,
   });
 
   useEffect(() => {
@@ -31,6 +32,10 @@ export function useGameControls(): Controls {
       if (KEYBOARD_CONTROLS.ACTION.includes(key)) {
         setControls((prev) => ({ ...prev, action: true }));
       }
+      if (KEYBOARD_CONTROLS.PAUSE.includes(key)) {
+        event.preventDefault();
+        setControls((prev) => ({ ...prev, pause: true }));
+      }
     };
 
     const handleKeyUp = (event: KeyboardEvent) => {
@@ -50,6 +55,9 @@ export function useGameControls(): Controls {
       }
       if (KEYBOARD_CONTROLS.ACTION.includes(key)) {
         setControls((prev) => ({ ...prev, action: false }));
+      }
+      if (KEYBOARD_CONTROLS.PAUSE.includes(key)) {
+        setControls((prev) => ({ ...prev, pause: false }));
       }
     };
 

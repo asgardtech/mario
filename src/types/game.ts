@@ -91,4 +91,5 @@ export interface Controls {
   jump: boolean;
   run: boolean;
   action: boolean;
+  pause: boolean;
 }

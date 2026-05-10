@@ -38,7 +38,8 @@ export function useGameLoop({
 
       if (elapsed > fpsInterval) {
         then = now - (elapsed % fpsInterval);
-        const deltaTime = elapsed / 1000;
+        // Cap delta time at 100ms to prevent physics instabilities
+        const deltaTime = Math.min(elapsed / 1000, 0.1);
         onUpdateRef.current(deltaTime);
       }
     };
